@@ -1,0 +1,483 @@
+{
+ "judge_ranked": [
+  {
+   "rank": 1,
+   "title": "Stake resume flow deadlocks: resume modal opens behind the opaque loader overlay",
+   "severity": "blocker",
+   "must_fix_for_3_stars": true,
+   "fix": "Move offerResume out of init() and call it from boot() after hideLoader(), or raise modal z-index above #loader (50) and drop the loader once progress hits 1; unlock audio from the Watch/Skip click.",
+   "evidence": "Code-verified: index.html #loader z-index:50 vs #scrim z-index:20; controller.ts init() awaits offerResume() (which blocks on 'm-resume' clicks) while main.ts only calls hideLoader() after init() resolves. Any Stake launch with round.active=true hangs the session at boot \u2014 a guaranteed review brick. Confidence maximal, impact maximal."
+  },
+  {
+   "rank": 2,
+   "title": "Social sweep mangles the mandatory verbatim disclaimer: 'Stake Engine' becomes 'Play Amount Engine'",
+   "severity": "blocker",
+   "must_fix_for_3_stars": true,
+   "fix": "Wrap the legal paragraph (and all 'Stake Engine' branding) in data-no-swap \u2014 sweepDom already honors it (social.ts:123) \u2014 or shield the phrase before the swap.",
+   "evidence": "Code-verified: info.ts legal page contains 'TM and (c) 2026 Stake Engine.' with no data-no-swap; social.ts maps 'stake'->'play amount'; sweepDom(#m-info) runs on build and re-runs on tab clicks. Verbatim disclaimer is a hard Stake requirement; this fails social-mode review outright."
+  },
+  {
+   "rank": 3,
+   "title": "Big-tier win never presents: 8 identical frames and a $0.00 settle",
+   "severity": "blocker",
+   "must_fix_for_3_stars": true,
+   "fix": "Fix the 02-big mock scenario to genuinely pay in the 20-50x band (or the presentation pipeline that stalls after early multiplier reveals), and add a guaranteed resolve beat so no spin ends on 6+ seconds of dead air.",
+   "evidence": "Corroborated by two independent audits (frame sequence 02-big-f02..settled all pixel-identical; p-03-big-settled shows Signal x24 with a board of finds and WIN $0.00). A reviewer's very first 'big win' spin shows zero celebration and zero payment \u2014 fatal to both the feel bar and payout-accuracy trust."
+  },
+  {
+   "rank": 4,
+   "title": "Bottom HUD overflows the viewport at 320px: turbo half off-screen, menu button missing",
+   "severity": "blocker",
+   "must_fix_for_3_stars": true,
+   "fix": "Make the bottom HUD width-aware below ~360px: shrink spin button diameter, reduce gaps/padding, collapse turbo+menu so all controls fit the 320px safe area.",
+   "evidence": "Screenshot-verified at v-mobile-s-idle/win. Design doc section 8 explicitly promises layout 'verified at 320x568'; losing the menu button entirely means core functions are unreachable on mobile-S \u2014 an automatic viewport-support failure."
+  },
+  {
+   "rank": 5,
+   "title": "Popout-S (400x225): board renders as a ~110px postage stamp \u2014 unusable",
+   "severity": "blocker",
+   "must_fix_for_3_stars": true,
+   "fix": "Add a dedicated small-landscape breakpoint: board fills available height (~190-200px), HUD pinned to edges, decorative field dropped.",
+   "evidence": "Screenshot-verified (v-popout-s-idle/win: ~18px tiles, indecipherable symbols, 45% empty grass). Design doc section 15 makes the 400x225 capture a named week-one pass/fail gate (junk lows readable, tag chip legible); this build fails its own gate."
+  },
+  {
+   "rank": 6,
+   "title": "Header logo overlaps the active stratum pill on every screen ('OPSOIL' / 'TOPS' / 'SOIL')",
+   "severity": "blocker",
+   "must_fix_for_3_stars": true,
+   "fix": "Give the avatar/logo a fixed-width reserved slot with the pills in a flex row after it; below ~360px hide the logo and abbreviate pills.",
+   "evidence": "Corroborated by two audits across 8+ screenshots including idle \u2014 it is the first thing a reviewer sees and looks like broken layout on literally every frame of play. Trivial confidence, huge first-impression impact on the 'attention to detail' 3-star bar."
+  },
+  {
+   "rank": 7,
+   "title": "Spacebar spin ungated on modals/loader/resume \u2014 re-entrant spins and /play against an active round",
+   "severity": "major",
+   "must_fix_for_3_stars": true,
+   "fix": "Guard the Space handler and spin-btn path with currentModal()===null, loader hidden, and a dedicated 'resuming' state set before opening the resume modal.",
+   "evidence": "Code-verified: controller.ts binds Space->spin() with no modal/loader check, wired before offerResume and before hideLoader. Space during the resume prompt fires /wallet/play against an active round (reviewer-visible ERR_VAL), closes the resume modal via the error modal, and leaves init() hung \u2014 this compounds rank 1 and is exactly a reviewer-provoked scenario."
+  },
+  {
+   "rank": 8,
+   "title": "The Signal Meter \u2014 the signature mechanic \u2014 is a flat cream web card with zero design and zero motion",
+   "severity": "major",
+   "must_fix_for_3_stars": true,
+   "fix": "Rebuild as the in-world detector readout (design doc asset 32: cream enamel, brass trim, red needle dial); on each tag reveal: badge pop, tile-to-panel spark, scale/pulse and number roll, glow at high values.",
+   "evidence": "Two audits, statically and across 30+ motion frames (x1 -> x852 with no visible tick ever). The design doc makes Ron's readout load-bearing ('delete Ron and the game loses its multiplier display'); shipping it as a default drop-shadow widget guts the game's identity and is the single biggest feel gap."
+  },
+  {
+   "rank": 9,
+   "title": "WIN meter behavior inconsistent everywhere: frozen through the bonus, spoils the mega climax, $0.00 mid-cascade",
+   "severity": "major",
+   "must_fix_for_3_stars": true,
+   "fix": "One rule game-wide: WIN accumulates visibly as each cluster/sweep pays (delta flash + persistent bonus bank), total commits only when a banner completes, never before.",
+   "evidence": "Three independent audits caught three contradictory grammars (bonus frozen at $2.00 across 10 sweeps while meter climbs to x49; mega WIN spoiled a beat before the banner rollup; base showing $0.00 with x24 lit). Design doc section 6: 'the win reveal IS the rollup, ticking up through each win' \u2014 directly violated in all three contexts."
+  },
+  {
+   "rank": 10,
+   "title": "Celebration ladder decoupled from magnitude: 44.8x gets plain text while 11x gets a MEGA banner",
+   "severity": "major",
+   "must_fix_for_3_stars": true,
+   "fix": "Drive banner tier off win-to-bet ratio everywhere including inside/at the end of the bonus, matching the design doc's winLevel table (MEGA >= 30x).",
+   "evidence": "Two audits; frame evidence is unambiguous (04-trigger-done 44.8x plain text vs 03-mega banner at 11x). Also contradicts the design doc's tier table where MEGA HOARD is >=30x \u2014 12.8x firing MEGA is both a feel bug and a doc violation. Spectacle inverted exactly at the moment reviewers weight most."
+  },
+  {
+   "rank": 11,
+   "title": "Big-win celebration staging is flat: no dim, no plate, no particles, mascot doesn't celebrate the top tier",
+   "severity": "major",
+   "must_fix_for_3_stars": true,
+   "fix": "Add radial dim/blur backdrop, themed banner plate (museum-plaque frame per design doc winLevel 5), tier-scaled particles, animated count-up, and drive Ron's arms-up roar pose for MEGA.",
+   "evidence": "Two audits; design doc section 6 specifies 'full-screen typography card + museum-plaque frame' for L5 and section 9 maps Ron's L5-L6 roar/double-take poses \u2014 a 2x currently out-emotes an 11x. This is the celebration layer the star rating hinges on."
+  },
+  {
+   "rank": 12,
+   "title": "UI chrome is a stock web kit: flat brown modals, bootstrap-green pills, iOS toggle",
+   "severity": "major",
+   "must_fix_for_3_stars": true,
+   "fix": "Build the themed panel/button system the design doc already specifies (assets 38-39: hand-painted wooden signs, rope-hung panels, coil-shaped button housing) and apply to menu, buy, autoplay, confirm, replay gate, and cards.",
+   "evidence": "Audit 1 across 7 modal screenshots; the design doc's asset list dedicates two full UI sheets to hand-painted wooden chrome that is simply absent. The 'community-tier vs studio-tier' distinction Stake's 3-star bar draws is exactly this."
+  },
+  {
+   "rank": 13,
+   "title": "Display font renders broken dashed/dotted glyphs on every headline",
+   "severity": "major",
+   "must_fix_for_3_stars": true,
+   "fix": "Replace the distressed display face with a clean chunky display font or pre-rendered headline art; if distress is intentional it must be far subtler at mobile sizes.",
+   "evidence": "Two audits, three screenshots (MEGA HOARD, THE BiG DiG, DIG COMPLETE) \u2014 reads as font corruption at the game's peak moments. Design doc specifies a 'hand-painted rounded lettering font', not a stencil; high confidence, high impact on perceived quality."
+  },
+  {
+   "rank": 14,
+   "title": "tileSym never cleared between bonus sweeps \u2014 pips promise wins the math never pays",
+   "severity": "major",
+   "must_fix_for_3_stars": true,
+   "fix": "Reset tile tracking on 'sweepStart' when refills cover the field (call resetTracking() there), so revealedCounts rebuild only from current-sweep reveals.",
+   "evidence": "Code-verified chain (presenter.ts sweepEnd clears display only; resetTracking runs once per round; bookgen refills all 36 tiles per sweep and evaluates current-sweep only). Pips showing 'Chalice 9/8' in hit state while the book pays nothing is an on-screen fairness/accuracy defect \u2014 the category Stake screens hardest."
+  },
+  {
+   "rank": 15,
+   "title": "Pips tracking uses stale tile indices after updateGrid slides \u2014 counts desync for the rest of the spin",
+   "severity": "major",
+   "must_fix_for_3_stars": true,
+   "fix": "In the 'updateGrid' handler, rebuild tileSym: delete clearedTiles, remap slide entries from->to (snapshot first), then recount().",
+   "evidence": "Code-verified: board.applyUpdateGrid moves survivors while presenter's tileSym map is never remapped, so overwrites and ghost entries corrupt counts permanently. Same fairness/accuracy class as rank 14 and occurs in the base game on every cascade, not just the bonus."
+  },
+  {
+   "rank": 16,
+   "title": "Win ticker jumps backward when a new setTotalWin lands mid-tick",
+   "severity": "major",
+   "must_fix_for_3_stars": true,
+   "fix": "Commit shownWin on every rendered frame inside step() so a superseding setWin starts from the last rendered value.",
+   "evidence": "Code-verified (hud.ts commits shownWin only at k===1; presenter emits setTotalWin per evaluation, two evaluations land inside the 900ms window in a cascade). A win amount visibly dropping mid-count violates the design doc's 'ticks UP through each win, never jumps' rule and reads as money being taken away."
+  },
+  {
+   "rank": 17,
+   "title": "Big Dig 'one persistent field \u2014 nothing resets' vs mock re-randomizing all 36 tiles every sweep",
+   "severity": "major",
+   "must_fix_for_3_stars": true,
+   "fix": "Fix the mock to match the design doc: refill only cleared/pipe tiles per sweep and keep revealed finds face-up across sweeps (the doc's section 4.5 mandates persistence, so the copy is correct and the bookgen/presenter are wrong).",
+   "evidence": "Code-verified (bookgen.runBonus overwrites f.board for all 36 tiles and resets f.revealed each sweep). The design doc explicitly requires 'ONE persistent field... nothing resets between sweeps', and game-info-vs-behavior contradiction is a known Stake rejection category visible to any reviewer who buys the bonus."
+  },
+  {
+   "rank": 18,
+   "title": "Jurisdiction flags: only 5 of 12 handled \u2014 displayNetPosition, displayRTP, displaySessionTimer, minimumRoundDuration absent",
+   "severity": "major",
+   "must_fix_for_3_stars": true,
+   "fix": "Extend the Jurisdiction interface to the full flag set; add net-position, RTP, and session-timer UI gated on their flags; clamp per-round presentation time to minimumRoundDuration (overriding turbo).",
+   "evidence": "Code-verified absence (rgs.ts declares 3 flags, controller acts on 6 total). The design doc's own compliance checklist requires 'all 12 jurisdiction flags honored', and these are flags Stake reviewers toggle during review."
+  },
+  {
+   "rank": 19,
+   "title": "Replay screen misses the mandated social term swaps (Feature Multiplier / Final Multiplier)",
+   "severity": "major",
+   "must_fix_for_3_stars": true,
+   "fix": "Add ['payout multiplier','final multiplier'] and ['cost multiplier','feature multiplier'] at the top of the social TABLE, or use dedicated social labels in runReplay.",
+   "evidence": "Code-verified: 'Cost Multiplier' swaps to 'Amount Multiplier' (wrong) and 'Payout Multiplier' not swapped at all; the swap list is an explicit SKILL mandate. Narrow surface but a hard compliance checkbox on the social replay path."
+  },
+  {
+   "rank": 20,
+   "title": "Tile win floaters barely visible, not per-cluster, one clipped off-screen",
+   "severity": "major",
+   "must_fix_for_3_stars": true,
+   "fix": "Spawn one bold stroked amount per paying cluster at the cluster centroid, clamped to the safe area, with scale-pop and rise.",
+   "evidence": "Screenshot-verified (faint unplated $2.00; 11.00 clipped at screen edge). The design doc compliance checklist explicitly requires 'simultaneous wins each float their own amount' at their own tiles \u2014 currently at most one pale global floater appears."
+  },
+  {
+   "rank": 21,
+   "title": "Win Table rows wrap badly and the modal clips pay information mid-sentence with no scroll affordance",
+   "severity": "major",
+   "must_fix_for_3_stars": true,
+   "fix": "Fixed-width symbol-name column with internal wrapping, plus a bottom fade/scroll indicator so the table visibly continues.",
+   "evidence": "Screenshot-verified (p-13: scatter pay line '5+ =' sliced in half by the modal edge). Clipped pay information is a game-info accuracy defect \u2014 a documented Stake rejection trigger \u2014 and cheap to fix."
+  },
+  {
+   "rank": 22,
+   "title": "Dead tail after every winning sequence: 3-7 duplicate frames with the Signal meter still lit into idle",
+   "severity": "major",
+   "must_fix_for_3_stars": false,
+   "fix": "Add an ~800ms settle flourish: meter drains to x1 with a whoosh, strata chip resets, Ron returns to idle \u2014 the meter reset doubles as the round-over signal.",
+   "evidence": "Frame-sequence verified (01-nice and 03-mega tails). Design doc says the meter 'dies with the round'; leaving it lit at x11 in idle misstates game state. Real and felt, but a pacing polish item rather than a star-gating defect on its own."
+  },
+  {
+   "rank": 23,
+   "title": "Sweep counter illegible, transient, and hide timers overlap \u2014 no persistent sweeps-remaining indicator",
+   "severity": "major",
+   "must_fix_for_3_stars": false,
+   "fix": "Plate the sweep title, add a persistent 'SWEEP 8/13' HUD chip during the bonus, clearTimeout stored handles in setSweepCounter, and give the retrigger a celebration beat.",
+   "evidence": "Both screenshot- and code-verified (uncancelled setTimeout(1100) vs sub-1.1s turbo sweep cadence). A 10-13 sweep bonus with no persistent progress readout is a genuine UX gap; the design doc's own layout gives the message line 'SWEEP 4 OF 10' duty."
+  },
+  {
+   "rank": 24,
+   "title": "Buy-bonus confirm race: a spin started during the confirm dialog silently swallows the purchase",
+   "severity": "major",
+   "must_fix_for_3_stars": false,
+   "fix": "Re-check this.locked after askConfirm resolves (with user feedback) and have spin() return a boolean so onBuyAccept can reset buyPending on rejected starts.",
+   "evidence": "Code-verified (locked checked only before the await; spin() returns silently when state!=='idle'). Real but requires the ungated-spacebar hole (rank 7) to be open; fixing rank 7 mostly closes this. Keep as a hardening fix."
+  },
+  {
+   "rank": 25,
+   "title": "Disabled and selection states read as broken: dead-grey dig button, green CTAs with muddy text, no selected state on buy cards",
+   "severity": "major",
+   "must_fix_for_3_stars": false,
+   "fix": "Explicit disabled treatment (~40% silhouette), neutral 'off' CTAs until selection, bright border + check selected state on buy cards (or pre-select the first).",
+   "evidence": "Two audits, multiple screenshots. Real detail-quality defects that feed the same 'stock web kit' impression as rank 12; largely subsumed by that fix but worth tracking separately."
+  },
+  {
+   "rank": 26,
+   "title": "Bet +/- and modal close X below the 44px tap-target minimum",
+   "severity": "major",
+   "must_fix_for_3_stars": false,
+   "fix": "Expand hit areas to >=44x44 via invisible pointer padding; bump visual size of -/+ at small widths.",
+   "evidence": "Measured from screenshots (~27-35px across viewports). Real ergonomics defect on the most-used controls, but a quiet one \u2014 reviewers feel it rather than fail it."
+  },
+  {
+   "rank": 27,
+   "title": "Big Ron pasted onto the scene: no ground shadow, floating feet, coil colliding with HUD, mismatched avatar style",
+   "severity": "major",
+   "must_fix_for_3_stars": false,
+   "fix": "Soft AO shadow ellipse under boots/coil, nudge onto the horizon line, HUD no-overlap zone, re-render the avatar in the mascot's colour style.",
+   "evidence": "Audit 1, multiple screenshots. Real compositing polish; the mascot acting itself is praised, so this is an integration pass, not a rework."
+  },
+  {
+   "rank": 28,
+   "title": "Deep Scan max win shows the 15,000x 'KING'S RANSOM' banner for the 500x-capped mode",
+   "severity": "minor",
+   "must_fix_for_3_stars": false,
+   "fix": "Template the max-win label from the mode's maxWinX instead of the hardcoded 15,000x string in fx.ts.",
+   "evidence": "Code-verified, and the design doc is emphatic: 'Never show 15,000x anywhere near this mode' and buy_deepscan 'never reaches L7'. Rare surface (only the 500x showcase book) but a direct doc violation and max-win accuracy defect; one-line fix."
+  },
+  {
+   "rank": 29,
+   "title": "All RGS errors collapse to 'Connection hiccup' \u2014 ERR_GLE/ERR_LOC/ERR_MAINTENANCE need distinct UX",
+   "severity": "minor",
+   "must_fix_for_3_stars": false,
+   "fix": "Branch on err.code in spin()'s catch: blocking messages without Retry for GLE/LOC, maintenance notice, low-balance flash for insufficient funds.",
+   "evidence": "Code-verified; the bridge already attaches err.code. Matters at real-RGS review time (gambling-limit errors must not invite retry-into-play); low effort, real compliance value."
+  },
+  {
+   "rank": 30,
+   "title": "Replay gate is a bare debug dialog: raw mode IDs, wrong win precision, response amount ignored",
+   "severity": "minor",
+   "must_fix_for_3_stars": false,
+   "fix": "Map mode through MODES[...].label, use moneyWin for the payout, prefer rep.amount/currency as fallback, and theme the gate with the logo/Ron/wooden panel.",
+   "evidence": "Code-verified data issues ('BUY BIGDIG' vs 'The Big Dig' violates the mode-name-match rule) plus screenshot-verified bare styling on the one screen non-players see from shared links."
+  },
+  {
+   "rank": 31,
+   "title": "Resume dialog always reports 'sweep 1 of N' regardless of actual progress",
+   "severity": "minor",
+   "must_fix_for_3_stars": false,
+   "fix": "Use sweeps[sweeps.length-1]?.sweep for the current sweep number in controller.ts offerResume.",
+   "evidence": "Code-verified (sweeps[0]?.sweep is always the first sweepStart). The design doc's resume copy explicitly promises actual progress ('You were on sweep 6 of 13'). One-line fix."
+  },
+  {
+   "rank": 32,
+   "title": "Hot Signal info page shows value ranges, not the complete obtainable list",
+   "severity": "minor",
+   "must_fix_for_3_stars": false,
+   "fix": "Render the exact TAG_BANDS arrays in the Hot Signals page, generated from the constant so it cannot drift.",
+   "evidence": "Code-verified ('x6-x20' implies x7/x9/x12 which are unobtainable). Note the design doc's info skeleton itself says 'value ranges', but Stake's rule that multiplier symbols list all obtainable values wins \u2014 cheap accuracy fix."
+  },
+  {
+   "rank": 33,
+   "title": "Bridge auto-authenticates on a replay launch carrying sessionID, with an unhandled ready rejection",
+   "severity": "minor",
+   "must_fix_for_3_stars": false,
+   "fix": "Skip auto-authenticate in the bridge IIFE when ?replay=true (resolve ready with null), or attach a no-op .catch in main.ts's replay path.",
+   "evidence": "Code-verified; violates 'zero session calls in replay' and risks a console error at review. Narrow trigger (replay link that also carries a session) but trivial to fix."
+  },
+  {
+   "rank": 34,
+   "title": "No betLevels in authenticate leaves unclamped DEMO_LEVELS \u2014 operator min/max/step ignored",
+   "severity": "minor",
+   "must_fix_for_3_stars": false,
+   "fix": "Synthesize levels from minBet..maxBet stepping by stepBet when betLevels is absent, and always clamp any list to the operator bounds.",
+   "evidence": "Code-verified gap. Mostly latent in a mocked-math build, but 'apply operator bet levels' is a classic rejection at integration; small defensive fix."
+  },
+  {
+   "rank": 35,
+   "title": "No tile-level anticipation on near-complete tallies \u2014 beep grammar has no visual counterpart",
+   "severity": "minor",
+   "must_fix_for_3_stars": false,
+   "fix": "On any 7/8 tally: slow reveal cadence, shimmer unrevealed tiles, sweep Ron's coil toward the next reveal, hold the last flip a beat.",
+   "evidence": "Frame-verified. The design doc's beep grammar and near-miss mascot map imply this layer; adding it is high feel-value but additive polish, not a defect."
+  },
+  {
+   "rank": 36,
+   "title": "Trigger card is text-only \u2014 the bonus announcement has no art or scatter payoff",
+   "severity": "minor",
+   "must_fix_for_3_stars": false,
+   "fix": "Composite the three found chests and celebrating Ron onto the card; animate the chests slamming into the title.",
+   "evidence": "Screenshot-verified; the in-board trigger beat is stronger than the card that follows. Design doc calls for a 'full-screen trigger takeover'."
+  },
+  {
+   "rank": 37,
+   "title": "Dig Complete summary undercuts the bonus: empty display case, contradictory stats, no count-up",
+   "severity": "minor",
+   "must_fix_for_3_stars": false,
+   "fix": "Render the actual topFind sprite in the plaque frame (bonusSummary carries topFind/deepestStratum/peakMeter), count up the total, fix the deepest-stratum stat.",
+   "evidence": "Screenshot-verified ghost smudge and 'deepest: Topsoil' contradiction; the book's bonusSummary event already carries the data per the design doc's event table, so this is presentation wiring."
+  },
+  {
+   "rank": 38,
+   "title": "Hot Signal multiplier badges are generic hexagons with unexplained colour semantics",
+   "severity": "minor",
+   "must_fix_for_3_stars": false,
+   "fix": "Restyle per the design doc's tags_sheet spec (verdigris bronze / silver-blue / glowing red-gold single ramp) and add a band legend in the Hot Signals tab.",
+   "evidence": "Screenshot-verified; the design doc already defines the three-band chip art the current flat hexagons ignore."
+  },
+  {
+   "rank": 39,
+   "title": "Night mode is a background swap, not a re-lit scene; pips clip the moon",
+   "severity": "minor",
+   "must_fix_for_3_stars": false,
+   "fix": "Cool ambient grade on tiles/symbols at night, warm lantern rim on grid edges, re-light Ron, offset the pip row from the moon.",
+   "evidence": "Screenshot-verified. Cohesion polish on the premium 400x buy mode; real but not gating."
+  },
+  {
+   "rank": 40,
+   "title": "Landscape composition: board offset from spin button/win-math centering; large dead field",
+   "severity": "minor",
+   "must_fix_for_3_stars": false,
+   "fix": "Treat board + win-math + spin button as one centered column and scale the board into the free space.",
+   "evidence": "Screenshot-verified misalignment. Landscape is a secondary orientation; fix after the two broken viewports (ranks 4-5)."
+  },
+  {
+   "rank": 41,
+   "title": "Bottom HUD text sits raw on background art; night mode loses bet controls in dark corners",
+   "severity": "minor",
+   "must_fix_for_3_stars": false,
+   "fix": "Consistent low-opacity dark strip behind BALANCE/BET/WIN, tuned stronger at night, targeting ~4.5:1 contrast.",
+   "evidence": "Two audits; real legibility issue on money-critical numerals, partially addressed by the HUD work in ranks 4 and 12."
+  },
+  {
+   "rank": 42,
+   "title": "Portrait base game has a ~100px dead band between board and bet HUD",
+   "severity": "minor",
+   "must_fix_for_3_stars": false,
+   "fix": "Use the band as the persistent win/message line in base play too (the design doc's layout already assigns it that role), or shift the board down and enlarge tiles.",
+   "evidence": "Screenshot-verified; design doc section 8 item 5 places the win/message line there permanently, so base-game emptiness is an implementation gap."
+  },
+  {
+   "rank": 43,
+   "title": "Win equation line reads as debug output: mixed glyphs, truncated names, stacking, no tier scaling",
+   "severity": "polish",
+   "must_fix_for_3_stars": false,
+   "fix": "Adopt the design doc's exact format ('{count}x {symbol} {basePay}x x SIGNAL x{meter} = {amount}x'), full names, soft dark pill, sequence beats, clear before banners.",
+   "evidence": "Three audits agree; the design doc mandates the equation line's exact format and full symbol names, so 'Pull' for 'Ring Pull' is a doc deviation. Cheap copy/style discipline pass."
+  },
+  {
+   "rank": 44,
+   "title": "Buy Bonus cards are text-only with no visual differentiation of price tiers",
+   "severity": "polish",
+   "must_fix_for_3_stars": false,
+   "fix": "Add a vignette illustration per tier (day field / trench / moonlit field) and a one-line cost differentiator; ensure Deep Scan card shows only its 500x ceiling.",
+   "evidence": "Screenshot-verified; also note the design doc requires the 500x ceiling on the Deep Scan buy card, never adjacent to 15,000x \u2014 verify while restyling."
+  },
+  {
+   "rank": 45,
+   "title": "Autoplay running state has no explicit stop affordance",
+   "severity": "polish",
+   "must_fix_for_3_stars": false,
+   "fix": "Render the countdown as a stop control: square stop glyph with the remaining count.",
+   "evidence": "Screenshot-verified; small discoverability gap."
+  },
+  {
+   "rank": 46,
+   "title": "flashMessage clobbers the persistent sweep message and restores to empty",
+   "severity": "polish",
+   "must_fix_for_3_stars": false,
+   "fix": "Track a base message in hud.ts and restore it after flashes instead of ''.",
+   "evidence": "Code-verified; contributes to the missing sweeps-remaining problem (rank 23) \u2014 fix together."
+  },
+  {
+   "rank": 47,
+   "title": "console.error calls remain in shipping paths reviewers deliberately provoke",
+   "severity": "polish",
+   "must_fix_for_3_stars": false,
+   "fix": "Gate diagnostics behind !bridge.isStake or ?debug=1 so the reviewed build logs nothing.",
+   "evidence": "Code-verified three call sites in exactly the provoked scenarios (bad rgs_url, bad replay link); clean-console is a review checkbox and this is a 10-minute fix."
+  },
+  {
+   "rank": 48,
+   "title": "Window resize during slides/drops leaves tiles at stale coordinates until the next setField",
+   "severity": "polish",
+   "must_fix_for_3_stars": false,
+   "fix": "Recompute posOf(destination) inside the tween callback or snap by tile index at completion.",
+   "evidence": "Code-verified but requires rotating the device mid-cascade; low frequency, low blast radius."
+  },
+  {
+   "rank": 49,
+   "title": "Dead code and misleading no-ops in presenter/controller",
+   "severity": "polish",
+   "must_fix_for_3_stars": false,
+   "fix": "Delete the void tileView loop, fix the Math.max(0, findIndex) clamp that hides the -1 case, remove or wire BoardCallbacks.",
+   "evidence": "Code-verified; pure code health, no player-visible effect except the silently-wrong default-bet mapping."
+  }
+ ],
+ "verdict": "1/3 as-is, with a clear path to 3/3. I verified the two scariest claims directly in source and both are real: the resume modal (z-index 20) opens behind the opaque loader (z-index 50) while main.ts awaits controller.init() -> offerResume() before ever hiding the loader, so any Stake launch with an active round bricks at boot; and the legal disclaimer's 'Stake Engine' text in info.ts has no data-no-swap guard while sweepDom runs over #m-info with a 'stake -> play amount' mapping, so social mode rewrites the mandatory verbatim disclaimer. Those two plus the $0.00 big-win scenario, the two broken viewports (which the design doc itself names as verified/gated sizes: 320x568 and the 400x225 week-one screenshot gate), and the universal header clip are the six items that fail or brick a review regardless of art quality. The must-fix tier for 3/3 then extends through the reviewer-provokable correctness seams (ungated spacebar, the two pips desyncs, the backward win ticker \u2014 all code-confirmed and all in the on-screen-accuracy category Stake screens hardest), the compliance checkboxes the design doc itself commits to (all 12 jurisdiction flags, replay social swaps, the persistent-field contradiction where the mock violates the doc's explicit 'nothing resets between sweeps' contract, per-cluster win floaters, unclipped pay info), and the game-feel layer that separates 2 from 3 stars (static Signal Meter vs the doc's load-bearing detector readout, inconsistent WIN meter vs the doc's 'ticks up, never jumps' rule, the inverted celebration ladder vs the doc's winLevel thresholds, flat big-win staging, stock web-kit chrome vs the doc's two dedicated wooden-UI asset sheets, and the corrupt-looking display font). Two merged findings were cut as speculative for a frontend-only build with mocked math: the present() MODES[mode] casing crash (the audit itself concedes it works on mock math today and the failure requires server book shapes this build never produces) and the auto_close_disabled zero-payout settle deadlock (its scenario requires a config flag not present in this build and its premise contradicts the design doc's stated assumption that the RGS auto-closes zero-payout rounds); both are worth one-line defensive hardening at real-math integration but do not belong on this submission's fix list. Everything ranked 1-21 is must-fix; nothing in it requires rearchitecting math or board logic \u2014 it is boot ordering, breakpoints, a swap-table guard, mock-book fixes, presenter bookkeeping, and a celebration/theming pass over systems that already exist.",
+ "verifications": [
+  {
+   "real": true,
+   "confidence": "confirmed",
+   "corrected_fix": "The suggested fix is correct; the minimal concrete edit is in src/info.ts line 117: change `<p class=\"legal\">` to `<p class=\"legal\" data-no-swap>`. sweepDom already skips data-no-swap subtrees for both text nodes (social.ts:123) and aria-label/title attributes (social.ts:133), and the attribute lives inside the renderInfo template string so it survives every innerHTML rebuild and every sweep entry point (main.ts:159/239, modals.ts:18, info.ts:126/129). This is safe because the legal paragraph contains no other restricted word \u2014 a replicated run of the exact swap pipeline shows 'Stake'\u2192'Play Amount' is the only substitution that fires in it \u2014 so no needed social swap is suppressed. No other user-facing 'Stake Engine' text exists in the DOM (remaining grep hits are code comments and the window.StakeEngineBridge identifier). Rebuild dist/ afterward since the shipped bundle embeds the same template.",
+   "notes": "Confirmed end-to-end. (1) Code: info.ts:117 has the disclaimer ending 'TM and \u00a9 2026 Stake Engine.' with no data-no-swap; social.ts:71 maps stake\u2192play amount; info.ts:129 sweeps the whole #m-info on build (including hidden pages) and info.ts:126 re-sweeps on tab clicks; main.ts:159 sweeps document.body at boot, so the mangle happens in social mode regardless of tab navigation. (2) Behavior: replicated the exact TABLE/regex/applyCase pipeline in Node against the literal paragraph \u2014 output is '...TM and \u00a9 2026 Play Amount Engine.' and that is the only substitution in the paragraph. (3) Visual: qa/full/s-04-info.png (social mode Legal tab) shows 'Play Amount Engine.' rendered in the actual build; qa/full/p-15-info-legal.png (normal mode) shows 'Stake Engine.' intact, isolating the regression to the social sweep. Severity as blocker is justified: the disclaimer must appear verbatim and the platform brand name is being rewritten in the copyright line, which fails social-mode review. Fix is frontend-only and does not touch mocked math."
+  },
+  {
+   "real": true,
+   "confidence": "confirmed",
+   "corrected_fix": "Gate the resume offer on the loader's TAP TO DIG click instead of awaiting it inside init(). (1) In src/controller.ts: delete the resume block at lines 111-115 from init() and add a public method `async maybeOfferResume(): Promise<void> { const round = this.rgs?.auth?.round; if (round?.active === true) await this.offerResume(round); }` (offerResume itself stays as-is). (2) In src/main.ts: change hideLoader(withStart) to return Promise<void> \u2014 for withStart=false resolve immediately after hiding; for withStart=true resolve inside startBtn.onclick after audio.unlock()/audio.setMusic('day') and starting the 400ms fade (resolve in the existing setTimeout so the loader is fully display:none). (3) In boot(): keep `await controller.init(); setLoaderProgress(1); ...teaser...;` then `await hideLoader(true); await controller.maybeOfferResume();`. Audio is already unlocked by the TAP TO DIG gesture, so no separate unlock on Watch/Skip is needed; no z-index changes needed; replay path (hideLoader(false)) and demo mode (no rgs.auth.round) are unaffected. Frontend-only, no math changes.",
+   "notes": "Confirmed against both source and dist build. Evidence verified: index.html #loader z-index:50 opaque full-viewport overlay (line 311-316, no pointer-events:none) vs #scrim z-index:20 (line 194), both body-level siblings in the same stacking context; controller.ts:113-115 awaits offerResume() which blocks on resume-watch/resume-skip clicks (lines 129-162) that are unreachable behind the loader; main.ts:172-180 calls hideLoader(true) only after init() resolves \u2014 so any Stake launch with auth round.active=true hangs at the 85%-progress loader forever. Identical compiled logic present in dist/assets/index-uqYOWpMo.js and dist/index.html:312. hideLoader is referenced nowhere else; no timeout dismisses the loader. QA screenshots (qa/full, qa/features) have zero resume coverage \u2014 demo mode never populates auth.round, so this is code-verified, not screenshot-verified. Severity 'blocker' and must_fix_for_3_stars are justified: Stake review explicitly tests reconnect-with-active-round. The issue's suggested fix is directionally correct but both variants have flaws: variant A (call offerResume after hideLoader()) still opens the modal behind the loader because hideLoader(true) returns before the TAP TO DIG click dismisses it (works but modal opens invisibly); variant B (raise modal z-index above 50) would make the 'Watch' presentation play invisibly behind the opaque loader since hideLoader only runs after init() resolves. Corrected fix sequences resume after the TAP TO DIG gesture, which also provides the audio unlock for the resume presentation."
+  },
+  {
+   "real": true,
+   "confidence": "confirmed",
+   "corrected_fix": "The suggested fix is correct in substance; sharpen it as follows (all frontend-only, no math/server changes). (1) In src/controller.ts extend RoundState with 'resuming' and, in offerResume(), set this.state='resuming'; this.refresh(); BEFORE openModal('m-resume') (done() already transitions to 'presenting'\u2192'idle'). (2) Add a single gate helper \u2014 const uiBlocked = () => currentModal() !== null || getComputedStyle(document.getElementById('loader')!).display !== 'none'; \u2014 importing currentModal from './modals'. Must use getComputedStyle, not loader.style.display, because the loader's visible display comes from the stylesheet so its inline style is '' while visible. (3) Put the guard at the TOP of spin() (single choke point covering Space, spin-btn, and any future callers): if (uiBlocked()) return; \u2014 this is safe because all legitimate callers (auto-start, buy-accept, resume-watch) call closeModal() synchronously before invoking spin()/present(). Also add the same check in the Space handler before the stopAutoplay branch so Space can't cancel autoplay through a modal. (4) Optional polish: hideLoader's TAP-TO-DIG path keeps display non-none for ~420ms during the opacity fade; gating on computed display keeps Space dead during that fade, which is acceptable, or flip a loaderHidden flag at fade start if instant re-enable is wanted. Note: this fix removes the reviewer-provoked Space\u2192/wallet/play\u2192ERR_VAL\u2192orphaned-resume path but does NOT fix the compounding rank-1 defect (loader z-index:50 sits above #scrim z-index:20, hiding the resume and error modals and making their buttons unreachable) \u2014 that stacking bug must still be fixed separately.",
+   "notes": "Every code claim in the evidence verified against the build. src/controller.ts:335-343 binds Space with only e.repeat + jurisdiction checks; spin() (line 186-187) guards only state!=='idle'. wireControls() runs at controller.ts:98 before offerResume at :114; hideLoader(true) at main.ts:180 runs only after controller.init() resolves, and offerResume's promise resolves only via watch/skip clicks. During the resume prompt state stays 'idle', so Space passes spin()'s guard and calls this.rgs.play() (controller.ts:205) = POST /wallet/play (public/stake-engine-bridge.js:74-79), which throws on non-ok responses. The catch (controller.ts:245-252) calls openModal('m-error'), and openModal unconditionally calls closeModal() first (modals.ts:12-13), closing m-resume and orphaning its promise \u2192 init() hangs forever, hideLoader never runs. Compounding confirmed: #loader is z-index:50 opaque (index.html:311-315) vs #scrim z-index:20 (index.html:194), so both resume and error modals render beneath the still-visible loader and the Retry button is unreachable \u2014 total lockup with state stuck at 'playing'. Also confirmed in demo mode: Space during the TAP-TO-DIG gate or any open modal (buy/confirm/auto/info/menu) fires a spin behind the overlay since only pointer events are blocked, not window keydown. Only unverified-by-execution detail is the exact RGS error code (ERR_VAL) for play-with-active-round, which can't be exercised locally; the client failure path triggers on any thrown error, and even an accepted play would be a duplicate bet against an unresolved round, so the defect stands regardless. Severity 'major' and must_fix_for_3_stars are justified: active-round reconnect + spacebar are standard Stake review probes."
+  },
+  {
+   "real": true,
+   "confidence": "confirmed",
+   "corrected_fix": "Add a width-keyed media query in index.html at max-width 400px (NOT ~360px \u2014 the HUD's natural minimum width is ~389px, so 375px iPhones also clip: menu overflows 15px at 375\u00d7667). Suggested CSS: @media (max-width: 400px) { #controls { padding: 4px 6px 2px; gap: 4px; } .ctl-group { gap: 4px; } .wood-btn { min-width: 38px; min-height: 38px; font-size: 13px; } .step-btn { min-width: 28px; min-height: 28px; font-size: 16px; } #bet-box { padding: 3px 4px; gap: 3px; } #bet-value { min-width: 44px; font-size: 12px; } #spin-btn { width: clamp(56px, 10.5vh, 72px); height: clamp(56px, 10.5vh, 72px); } }. Budget check at 320\u00d7568: 12 padding + 8 grid gaps + 116 bet-box + ~60 spin + 122 right group \u2248 318px \u2264 320. Collapsing turbo+menu is NOT needed once sizes shrink (and would cost one-tap turbo access); 38px touch targets are an acceptable trade at this width. Optionally add a horizontal-overflow probe to tools/qa-full.mjs (assert each control's right edge \u2264 innerWidth) so this can't regress \u2014 the existing overlap probe only checks vertical topbar/board overlap, which is why report.json was clean.",
+   "notes": "CONFIRMED by live measurement against the running build (localhost:5174) at 320\u00d7568: #menu-btn rect 334.2\u2192378.2 is fully off-screen, elementFromPoint at its center is null, document scrollWidth=320 (no scroll path) \u2014 menu is truly unreachable, and it is the only gateway to Game Info & Rules, Buy Bonus, Rally, Coil Select, Sound (index.html:450-470). Screenshots qa/full/v-mobile-s-{idle,win}.png are genuine 320\u00d7568 captures (tools/qa-full.mjs:198). docs/design-doc.md:211 promises 'verified at 320\u00d7568'. Root cause: #controls grid '1fr auto 1fr' (index.html:139) with hard minimums (bet-box 144px, spin clamp(64px,12vh,92px), right group 3\u00d744px btns) \u2192 ~389px natural min width; the only shrink media query (index.html:344) keys on max-height\u2264300px so it never fires at 320\u00d7568. Two evidence inaccuracies, neither changing the verdict: (1) the half-clipped button is autoplay \u25b6\u25b6 (#auto-btn, 8px clipped), turbo \u26a1 is fully visible; (2) the proposed ~360px breakpoint is wrong \u2014 measured 15px menu overflow even at 375\u00d7667, so the fix must trigger at \u2264~400px. Fix is frontend-only CSS in index.html, fully in scope, no math/RGS impact. Severity 'blocker' is justified (viewport-support failure + game info unreachable on mobile-S and clipped on 375px devices)."
+  },
+  {
+   "real": true,
+   "confidence": "confirmed",
+   "corrected_fix": "Fix the mock book generator, not the presenter. In /home/x/Desktop/Stake-Engine/hoardsweeper/src/mock/bookgen.ts generateBook() (lines ~643-676), forced paying buckets must be guaranteed to land in their OWN design bands (big = 10-30x, mega = 30-100x for base modes \u2014 not the issue's 20-50x): (1) for base 'big'/'mega' bucket params, override the default pipeAfter:[7,14] to null (or a late window) and raise the reveal budget/digBias so sweeps reveal enough tiles to reach MIN_MATCH=8; (2) optionally seed newField with a dominant-symbol cluster for these buckets so an 8+ group is actually reachable; (3) replace the silent `return best!` fallback with escalating retries (progressively raise rich/tagMul per attempt batch, demo-only cost) so a forced 'big'/'mega' book can never pay 0. Do NOT add a \"guaranteed resolve beat\" to the presenter \u2014 verified no stall exists: the big spin completed in ~2s, the game returned to idle, and subsequent spins (nice $2.00, mega $11.00) presented and settled in the same session; the finalWin\u2192bigWinCard celebration path (src/presenter.ts:290-317) already works and will fire once books genuinely pay \u226510x (lastWinLevel>=5) / \u226530x (card). Separately harden tools/capture-features.mjs to wait for round-idle instead of fixed timeouts so \"settled\" shots always capture the true end state. All frontend-only, mocked math \u2014 in scope.",
+   "notes": "Issue is REAL in effect but the described mechanism is partly wrong. Confirmed: qa/features/02-big frames f02..settled are static except the mascot idle animation (~2% pixel diff, so not literally \"pixel-identical\"); the forced 'big' spin paid $0.00 \u2014 balance proves it (01-nice settled $1,001, 02-big f00 $1,000 after bet, 02-big-settled still $1,000). qa/full/p-03-big-settled confirmed: Signal x24, revealed finds, WIN $0.00, balance $999. Root cause quantified by executing src/mock/bookgen.ts via tsx: forced 'big' (base_standard) lands its 10-30x band only 20.5% of runs and pays exactly 0 in 39%; forced 'mega' lands 30-100x only 16% and pays 0 in 48% (it paid 11x in the capture). Cause: generateBook rejection-samples 120 attempts then silently returns the closest miss (often 0x); the band is nearly unreachable because base big/mega params keep the default pipeAfter:[7,14] (sweep ends after 7-14 reveals) while wins need 8-of-a-kind (MIN_MATCH=8). Refuted: no presentation-pipeline stall \u2014 the round settled and the next forced spins presented/paid in the same browser session; the 6+s dead air is the capture harness's fixed waits (10x800ms frames + 6s), not in-game. The $0.00 with Signal x24 is internally consistent (meter multiplies win groups; none formed) \u2014 honest display, broken scenario. Severity as demo/QA blocker is fair: a reviewer's forced \"big win\" spin shows zero celebration and zero pay ~40% of the time, and the same fallback also pollutes natural big/mega draws in demo mode."
+  },
+  {
+   "real": true,
+   "confidence": "confirmed",
+   "corrected_fix": "Suggested fix is right and frontend-only; refine it as follows since the art already exists. (1) Skin the existing DOM #meter-box (index.html:94-108) with the shipped-but-unreferenced asset public/assets/ui/meter.webp (design doc asset 32) as its background-image; place the numeral inside the display window and add a small needle element over the painted dial hub, rotated via CSS transform proportional to the meter value (log-ish scale so x1..x852 maps to the dial arc). (2) Wire the already-declared-but-never-assigned Board callback onTagSurfaced (src/board.ts:167, fired at 256/274) in the controller/presenter to: fx.burst at the tile, a short gold spark tween from board.tileGlobal(tile) toward the meter's screen position (Hud already does DOM rect math via boardRect(); add a meterRect() that returns #meter-box.getBoundingClientRect() converted to canvas coords), then hud.setMeter. (3) Upgrade Hud.setMeter (src/hud.ts:29-36) from the single 180ms bump: rAF number-roll tween (reuse the pattern already in setWin, hud.ts:110-138), needle kick + settle on each delta, escalate the existing .hot state (>=25) to a persistent CSS glow/pulse on the box, stronger flash + needle peg on deepScan (presenter.ts:145-156 currently only fires a center-screen burst). Constraint: keep the numeral legible at the Popout-S 400x225 gate (design-doc section 224/444) - the device art must not shrink the number below readable size.",
+   "notes": "All core claims verified against the build. #meter-box is a flat CSS cream card (linear-gradient, 2px border, generic drop shadow) in index.html:94-108; screenshots qa/full/p-01-idle.png (x1), p-04-mega.png (x32), qa/features/04-trigger-bigdig-f19.png (x44), 05-nightdig-f18.png (x71) all show the identical static widget with no device art, needle, or dial. The design-doc asset 32 readout EXISTS at public/assets/ui/meter.webp (viewed: cream enamel, brass trim, red needle dial, floral charm) but grep finds zero references in src/ or index.html - generated and never wired in, making the fix cheaper than the issue implies. Design-doc load-bearing citations check out (lines 216, 230, asset row 32). Tag-to-meter FX confirmed absent: onTagSurfaced is declared and fired in board.ts but has no consumer anywhere; deepScan only fires a generic center-screen particle burst. One minor overstatement: \"zero motion\" is not literally true - setMeter applies a 180ms scale-1.25 bump on the numeral and a .hot red color at >=25 (visible as red text in high-meter frames) - but this is imperceptible across capture frames and does not change the verdict. I could not locate an x852 frame specifically, but frames from x1 to x71 uniformly show the static card, consistent with the evidence. Severity \"major\" and must_fix_for_3_stars are reasonable given the doc calls the readout load-bearing."
+  },
+  {
+   "real": true,
+   "confidence": "confirmed",
+   "corrected_fix": "Direction of the suggested fix is right; refine as follows (all frontend, no math changes). (1) index.html: extend the existing tiny-viewport media query (line 344, `@media (max-width:480px) and (max-height:300px), (max-height:260px)`) into a true small-landscape layout: make #topbar, #controls and #footer position:absolute clusters pinned to the viewport edges (meter top-right, pills top-center or left column, dock-face top-left; bet box + balance bottom-left; spin/turbo/auto/menu in a right-side column; win bottom-right), and give #board-slot absolute inset of roughly `6px 96px` so its free height becomes ~200px instead of today's 74px. Nothing may overlap the grid (design-doc section 15 gate: \"nothing over the grid\"), so the realistic board size is ~185-200px square (cells ~28-30px vs today's 7px) with HUD beside it, not over it. (2) src/main.ts relayout() (lines 120-152): for tiny heights (e.g. `window.innerHeight <= 260`), force ronW = 0 and ron.visible = false \u2014 full-figure Ron must collapse to the micro-dock face at Popout-S per design-doc section 8 \u2014 and keep vBias 0.5 so the board centers between the pinned side clusters. Remove reliance on the `Math.max(60, ...)` floor (line 129): with the slot restructured the fit-to-slot logic already yields ~190px. (3) Do NOT drop the background: the \"45% empty grass\" is just the fullscreen #bg showing through around a 57px board; once the board fills the height the composition fixes itself. After the change, re-run `node tools/qa-full.mjs` and re-check the section-15 gate items (junk lows readable, red-gold tag chip legible, three pills, meter numeral, micro-Ron dock face).",
+   "notes": "CONFIRMED by screenshots, live-build measurement, and code. Captures qa/full/v-popout-s-{idle,win}.png are 800x450 = 400x225 CSS @ DPR 2 (tools/qa-full.mjs:198, deviceScaleFactor 2 at line 19). Measured board: ~114 image px = ~57 CSS px wide; win symbols are unreadable blobs (zoom-verified). Live measurement at 400x225 (vite preview + Playwright): in-flow HUD rows eat 151/225px (topbar 45, msg-line 14, controls 52, footer 40) leaving #board-slot 74px; src/main.ts:120-139 then pads 12px and computes gap=3, cell=7 -> board 57px, matching the screenshot exactly. The issue's \"~110px board / ~18px tiles\" are image-pixel (2x) measurements of the same thing \u2014 accurate in substance. Additional confirmed defect the issue implies: 400x225 hits the `wide` branch (main.ts:126), reserving an 80px column and drawing tiny full-figure Ron, contradicting design-doc section 8 (\"At Popout-S 400x225 Ron collapses to the micro-dock face\"). Design-doc section 15 gate #1 (line 444) names this exact 400x225 capture pass/fail on junk-low readability and tag-chip legibility \u2014 the build fails its own gate, so blocker/must_fix is justified. Suggested fix is in-scope (frontend-only) and directionally correct; corrected details: 190-200px board only achievable with side-column HUD (gate forbids anything over the grid; ~185-200px realistic), and \"decorative field dropped\" should be \"drop full-figure Ron + the ronW reservation\" \u2014 the grass is the fullscreen #bg backdrop and needs no change. The existing popout-S media query (index.html:344-356) shrinks widgets but cannot help while the HUD rows remain in-flow in the #hud flex column."
+  },
+  {
+   "real": true,
+   "confidence": "confirmed",
+   "corrected_fix": "In /home/x/Desktop/Stake-Engine/hoardsweeper/index.html (CSS only, frontend-only, no math changes): (1) Fix the dead media query at line 336 \u2014 change `#brand-logo { display: none; }` to `#brand img#brand-logo { display: none; }` (or equivalently raise its specificity / change line 76's `#brand img` selector) so the existing max-width:640px hide actually applies; this alone fixes every 430px portrait frame (verified live: TOPSOIL fully visible, no overlap). (2) Add `overflow: hidden;` to the `#brand` rule (line 75) as a guard so an overflowing logo can never paint across the pills. (3) For very narrow viewports add: `@media (max-width: 380px) { #depth-pills { flex: 0 1 auto; min-width: 0; } .pill { overflow: hidden; text-overflow: ellipsis; min-width: 0; } }` (or abbreviate pill labels) \u2014 verified at 320x568: pills no longer overlap the avatar and truncate gracefully. Re-run tools/qa-full.mjs afterward to regenerate screenshots.",
+   "notes": "Reproduced against the served dist build with Playwright at the exact QA viewport (430x932, DPR 2). Measured logo rect x=64-108 overlapping lit pill starting at x=91 (~17px, hides the 'T' -> 'OPSOIL'); night bonus with wide x852 meter shrinks #brand further ('SOIL'); at 320px the pill row overlaps the avatar ('TOPS' + logo mid-pill). Root cause is twofold and differs from the audit's implied diagnosis: (a) the intended small-screen hide `@media (max-width:640px){ #brand-logo{display:none} }` (index.html:336) never applies because `#brand img{...display:block}` (index.html:76) has higher specificity (1-0-1 vs 1-0-0) \u2014 confirmed via computed style `display:block` at 430px; (b) topbar inflexible content (~467px: pills flex:none ~247px + meter min-width 74+borders + gaps + padding) exceeds 430px, so #brand (min-width:0) shrinks and its logo img overflows unclipped over the pills. The issue's suggested fix is wrong: a fixed-width reserved logo slot cannot work at 430px (467px of inflexible content would clip the signal meter offscreen instead), and hiding the logo only below ~360px leaves the overlap intact at 430px \u2014 the very viewport all QA frames use. One evidence caveat: landscape/desktop headers (v-landscape-idle) are clean, so 'every screen' overstates slightly \u2014 it is every portrait-phone frame, which is still the primary Stake review surface, so blocker severity is reasonable. Corrected fix was applied live via addStyleTag and verified with screenshots at 430x932 (clean, TOPSOIL legible), 320x568 (no avatar overlap, graceful ellipsis), and 1280x720 (logo still shown, unchanged)."
+  },
+  {
+   "real": true,
+   "confidence": "confirmed",
+   "corrected_fix": "The suggested fix is directionally right and in-scope (frontend-only, no math impact), but it says to \"build\" assets that mostly already exist. Corrected plan: (1) Use the already-generated but completely unreferenced sheet /public/assets/ui/signs.webp \u2014 it contains the square panel backboard, rope-hung dialog sign, toggle plank with gold knob, round button, and arrow buttons from design-doc assets 38-39. Slice it into individual sprites (tools/ or an offline crop; it is one flattened 640px sheet, not usable directly). (2) Skin the EXISTING DOM modal system rather than rebuilding it: keep src/modals.ts logic and index.html structure/aria intact; replace `.modal`'s flat `var(--panel)` background with the wooden panel via 9-slice `border-image` (the square panel's ornament corners tolerate 9-slice) or a layered wood-texture background + painted frame, since the fixed-aspect rope-hung sign cannot stretch to variable-height content (buy list, scrolling info tabs) \u2014 use the rope-hanger crop as an absolutely-positioned decorative top strip instead. (3) Replace the iOS `.switch` (index.html lines 249-254) with the toggle-plank sprite (knob slides along the plank; keep the hidden checkbox input for a11y). (4) Restyle the green CTA pills (Buy/Play/Collect/Start Autoplay/Start Digging) as painted wood-and-gold buttons using the round/rect button crops or a texture+bevel CSS treatment, keeping min tap sizes. (5) The \"coil-shaped button housing\" (asset 39) is NOT on the existing sheet and is for the spin button (#spin-btn, currently a plain radial-gradient circle) \u2014 generate that one missing piece, or defer it as a separate item since the issue's listed surfaces are the modals/cards. Apply across menu, buy, buy-confirm, autoplay, generic confirm, replay gate, info tabs, and feature-card CTAs.",
+   "notes": "CONFIRMED. Screenshots p-09/p-10/p-11/p-16/r-01/p-05/p-07 in qa/full/ all show flat CSS chrome: brown rounded-rect modals, iOS toggles (green track when on), flat green CTA pills. Code confirms: index.html `.modal` (line ~200) is background:var(--panel) with CSS border; `.switch` (lines 249-254) is a literal iOS toggle; CTAs are CSS gradients. Design doc lines 324-325 specify assets 38 (ui_signs_1: panel backboards, toggle plank, arrow buttons) and 39 (ui_signs_2: rope-hung dialog panel, coil-shaped button housing). Critical detail the issue missed: /public/assets/ui/signs.webp was generated and contains exactly this chrome (panel, rope-hung sign, toggle plank, round button, arrows) but has ZERO references in src/ or index.html \u2014 the work is asset-slicing and CSS skinning, not asset creation, except the coil button housing which is absent from the sheet. Minor wording nit: green is the theme's own --meadow, not literally Bootstrap, but the studio-tier gap the issue describes is real and visible."
+  },
+  {
+   "real": true,
+   "confidence": "confirmed",
+   "corrected_fix": "Do NOT replace the font. Add `paint-order: stroke fill;` to the five CSS rules in index.html that use `-webkit-text-stroke` (#fc-title line ~271, #fc-amount ~275, #bigwin-tier ~289, #bigwin-amount ~296, #sweep-counter ~306). This paints the stroke beneath the fill, hiding the variable-font overlap seams; verified clean in the project's own Playwright Chromium. Since half the stroke then sits under the fill, roughly double each stroke width (2px\u21924px, 1.5px\u21923px) to preserve the intended outline weight. (Fallback if wider browser support is wanted: drop -webkit-text-stroke and fake the outline with layered text-shadows.) Frontend-only, no math/logic changes.",
+   "notes": "Symptom is real and confirmed in qa/full/p-04-mega.png, p-05-trigger-card.png, p-07-summary-card.png, but the issue's diagnosis is wrong. The font is the genuine Baloo 2 variable font (fontTools: name=\"Baloo 2\", fvar wght 400-800) \u2014 the exact rounded lettering the design doc specifies, not a distressed/stencil face. Root cause: -webkit-text-stroke strokes the unmerged overlapping contours inside variable-font glyphs, producing dash/hatch cuts. Proof: in the same screenshots, all Baloo2 text WITHOUT text-stroke (buttons, SIGNAL meter, sub-copy) renders clean; a minimal repro in the project's Playwright Chromium shows the game's exact CSS (-webkit-text-stroke:2px) reproduces the corruption while paint-order:stroke fill renders cleanly at the same weight. PixiJS Text strokes (src/fx.ts:122, src/board.ts:130) are unaffected (Pixi paints stroke under fill). The proposed fix (swap font / pre-rendered art) is overkill and could recur with any variable font; the correct fix is a ~5-line CSS change."
+  },
+  {
+   "real": true,
+   "confidence": "confirmed",
+   "corrected_fix": "Frontend-only, keep mocked math untouched. (1) index.html #bigwin: add a radial dim + blur when .open (e.g. background: radial-gradient(ellipse at center, rgba(30,22,10,.4) 20%, rgba(30,22,10,.75)); backdrop-filter: blur(4px)) \u2014 mirror the existing #feature-card treatment. (2) Add a museum-plaque plate behind #bigwin-tier/#bigwin-amount reusing the existing /assets/ui/plaque.webp (already used by #fc-plaque in the trigger card), sized per tier; design doc \u00a76 L5 specifies exactly this. (3) src/presenter.ts finalWin: fire fx.goldStorm for level 5 too (shorter, ~1400ms) and keep shake+longer storm for 6-7 so particles scale with tier; currently level>=6 requires winX>=100 so the card tier shown in QA (12.8x) gets nothing. (4) Drive Ron per design doc \u00a79: ron.show('roar') for levels 5-6 before bigWinCard (arms-up roar sheet exists as ron_roar.webp; 'faint' for 7 is already correct), and in the setWin handler extend the reaction to winLevel 5-6 (currently only 2-4 react \u2014 an 11x setWin is silent while a 2x gets thumbs + sting): play win audio, ron.show('roar', ~1800), and a hold. (5) DROP the 'add animated count-up' item \u2014 bigWinCard in src/fx.ts already counts up from 0 (lines 198-209). (6) Optional but recommended: reconcile the three conflicting tier ladders (winlevels.ts SDK ladder, bookgen winLevelForCents, presenter finalWin's 100x/1000x gates, design doc \u00a76 thresholds) so 'MEGA HOARD' fires at the doc's >=30x instead of 10x and EPIC/particle tiers are reachable; a one-line change making finalWin derive level from a single shared threshold table suffices.",
+   "notes": "CONFIRMED via code + screenshots. Code: index.html lines 280-300 \u2014 #bigwin has no background/dim/blur/plate (vs #feature-card's rgba dim + blur(5px) + plaque.webp). presenter.ts finalWin (296-315): goldStorm/shake gated to level>=6 which requires winX>=100, so the 10-100x 'MEGA HOARD' card gets zero particles/shake; only level 7 (>=1000x) changes Ron's pose ('faint'); levels 5-6 never pose him. presenter.ts setWin (193): only winLevel 2-4 react; winLevel 5-6 setWin events are completely silent \u2014 with bookgen's ladder (10-30x -> 5) the evidence's '2x out-emotes an 11x' is literally true (2x -> level 3 -> win_3 + thumbs; 11x -> level 5 -> nothing). Screenshots: qa/full/p-04-mega.png shows 'MEGA HOARD $12.80' as bare floating text over the fully-lit busy board, barely legible, no dim/plate/particles, Ron still in bent-over sweep pose; qa/features/03-mega-settled.png (11x) shows Ron idle; qa/full/p-02-big-mid.png shows no staging. Design doc \u00a76 (L5 'full-screen typography card + museum-plaque frame') and \u00a79 (setWin 5 -> arms-up roar, 6 -> double-take, 7 -> faint) match the issue's citations exactly. One suggested-fix item is wrong: the animated count-up already exists in fx.ts bigWinCard (lines 198-209), so that item should be dropped. Assets needed for the corrected fix already exist (public/assets/ui/plaque.webp, assets/ron/ron_roar.webp). Root-cause bonus: three inconsistent win-tier ladders (winlevels.ts, bookgen winLevelForCents, presenter finalWin gates vs design doc \u00a76) cause the card to fire at 10x labeled MEGA HOARD and make particle tiers nearly unreachable."
+  },
+  {
+   "real": false,
+   "confidence": "refuted",
+   "corrected_fix": "No fix needed for the described issue \u2014 behavior already follows one consistent rule (WIN = cumulative paid amount, ticked up at every paying evaluation via setTotalWin; SIGNAL meter is independent multiplier potential), which is exactly design doc \u00a76. Do NOT implement the suggested fix: \"total commits only when a banner completes, never before\" directly contradicts \u00a76 (\"the win reveal IS the rollup, ticking up through each win\"). Separate real bug found while verifying: winLevelForCents in src/mock/bookgen.ts:320-329 is off-by-one vs the \u00a76 tier table (should be: <1x\u21921, <3x\u21922, <10x\u21923, <30x\u21924, <100x\u21925, <1000x\u21926, else 7). Fix those bands, and optionally tighten the big-win card gate in src/presenter.ts:296 to winX >= 30 alone, so a 12.8x round no longer shows the MEGA HOARD card (see qa/full/p-04-mega.png).",
+   "notes": "All three evidence items re-verified against code + screenshots and each is honest behavior, not contradictory grammar. (1) Bonus \"frozen at $2.00\": $2.00 is the 3-chest scatter pay (scatterPay(3)=200 cents, src/books.ts:230); MIN_MATCH=8 and pips show 7/8 and 6/8 near-misses all bonus \u2014 no cluster paid, so WIN correctly held; the moment one paid, WIN ticked $2.00\u2192$46.80 (qa/features/04-trigger-done.png, \"8\u00d7 Horseshoe 0.8x \u00d7 SIGNAL x56 = 44.8x\"); qa/full/p-07-summary-card.png confirms a bonus can genuinely pay only $2.00 total. (2) \"Mega spoiled before banner\": mock books emit setTotalWin after every paying evaluation (src/mock/bookgen.ts:267) and the presenter ticks the HUD (src/presenter.ts:268-273, src/hud.ts:110-138) \u2014 design doc \u00a76 explicitly prescribes this (\"Per-evaluation setWin uses the evaluation amount; the end-of-round celebration uses the round total... the win reveal IS the rollup, ticking up through each win\"); the banner count-up-from-0 is added drama on top. The issue quotes \u00a76 but inverts its meaning. (3) \"$0.00 with x24 lit\" (qa/full/p-02-big-mid.png): meter is tag-built multiplier potential; nothing had paid yet, $0.00 is correct. The 03-mega feature capture settled at $11.00 with no banner because rejection sampling returned an 11x book \u2014 WIN accumulated normally there too ($11.00 shown from f09 on). Genuine adjacent defect (different issue): off-by-one win tiers in bookgen's winLevelForCents cause a 12.8x round to show MEGA HOARD (qa/full/p-04-mega.png) via presenter's lastWinLevel>=5 gate; worth filing separately."
+  },
+  {
+   "real": true,
+   "confidence": "confirmed",
+   "corrected_fix": "Three concrete changes (all frontend/mock, in scope): (1) src/mock/bookgen.ts:320 winLevelForCents \u2014 align to design-doc \u00a76 by shifting every threshold down one tier: x<1\u21921, x<3\u21922, x<10\u21923, x<30\u21924, x<100\u21925, x<1000\u21926, else 7 (current code returns 5 for [10,30), which is the direct cause of MEGA HOARD at 11x/12.8x). (2) src/presenter.ts:296 \u2014 change `if (lastWinLevel >= 5 || winX >= 30)` to `if (winX >= 30)` so the end-of-round card is driven purely by round-total-to-bet ratio; the level mapping on line 297 (30/100/1000 \u2192 5/6/7) already matches the doc and needs no change. (3) src/presenter.ts:193-199 setWin case \u2014 stop dropping winLevel>=5 evaluations on the floor: play escalated win audio and apply the doc \u00a77 pause (level 5 +2.8s w/ typography card, level 6 +4.5s), so a 44.8x evaluation inside the bonus gets a real beat instead of only the SURVEY-stamp equation line. Optional cleanup: src/winlevels.ts carries a second, conflicting SDK-style ladder (BIG>=25/SUPER>=60/MEGA>=150); only superTextFor is live (>=1000x card text, where it shows 'EPIC WIN'/'MAX WIN' instead of the doc's KING'S RANSOM) \u2014 align its names to the doc tier names or delete the dead WIN_LEVELS table. Also note for verification: tools/capture-features.mjs never reaches the end of the trigger bonus (last shot ~46s while the bonus is still running), so extend the tail wait or tap through cards before using those frames as banner evidence.",
+   "notes": "Core claim CONFIRMED with hard evidence: qa/features/03-mega-f04.png shows a full-screen MEGA HOARD card counting up an 11x win, and qa/full/p-04-mega.png shows MEGA HOARD at 12.8x \u2014 both violate design-doc \u00a76 (MEGA HOARD >= 30x; 10-30x is BIG FIND with no board-covering card). Root cause traced: bookgen's winLevelForCents is off-by-one vs the doc ladder, and presenter's finalWin fires the card on `lastWinLevel >= 5` (book level) in addition to `winX >= 30`, letting the inflated level leak through. The 44.8x half is real but the cited frame is misread: 04-trigger-done is a MID-BONUS capture (equation line still on screen; present() clears it at round end; the -settled shot 12s earlier shows WIN $2.00 mid-bonus), so it does not prove the end-of-round banner never fired \u2014 bookgen emits finalWin after bonusSummary and the 46.8x total would have shown a correctly-labeled MEGA HOARD card after the capture window closed. The genuine defect behind that frame is presenter.ts:193-199: per-evaluation setWin handles only winLevel 2-4, so a level-5/6 evaluation (44.8x) gets zero audio/pause/card at the moment it lands, contrary to doc \u00a77's winLevel 5-7 pause rows \u2014 spectacle inversion is real in feel. The issue's one-line fix is directionally right but under-specified: driving the END-of-round card off win-to-bet ratio alone fixes the 11x MEGA banner, but without also fixing bookgen's level map and adding the per-evaluation level>=5 beat, in-bonus big evaluations would still read as plain text. Severity 'major' / must-fix is justified: the flagship celebration currently fires at ~1/3 of its doc threshold (any >=10x win), cheapening the entire ladder."
+  },
+  {
+   "real": true,
+   "confidence": "confirmed",
+   "corrected_fix": "The suggested fix is correct and in-scope. In src/presenter.ts, case 'sweepStart' (lines 101-110), reset symbol tracking when the field is reburied. Preferred robust form (matches the existing updateGrid resync pattern at presenter.ts:212-213 and stays correct even for partial refills): after `if (e.refills.length) await this.board.rebury(e.refills);` add `this.tileSym = new Map(this.board.revealedSymbols()); this.recount();` \u2014 rebury() sets refilled tiles face-down, so board truth yields exactly the still-revealed tiles. The simpler `this.resetTracking()` also works since bookgen's runBonus always refills all 36 tiles per sweep. No changes to the mock math (bookgen evaluate() is already current-sweep-only and pays correctly); this is purely a presenter/HUD tracking fix.",
+   "notes": "Verified end-to-end. Code: presenter.ts sweepEnd (line 234-238) clears the pips DOM only; tileSym/revealedCounts survive across sweeps; resetTracking() runs once per round (controller.ts:197 spin, main.ts:248 replay), never per sweep; sweepStart handler reburies visuals but never clears tracking. Math: bookgen.ts runBonus (lines 496-506) refills all 36 tiles each sweep with revealed=false, and evaluate() (lines 232-241) counts only currently-revealed tiles \u2014 so pips and math diverge from sweep 2 onward. Screenshots confirm the on-screen symptom: qa/full/p-06-bonus-sweep.png shows SWEEP 2 OF 10 with only 3 tiles revealed but pips reading 7/8, 5/8, 3/8; qa/features/04-trigger-bigdig-f10.png shows SWEEP 5 OF 13 on a freshly reburied field with an 8/8 hit-state pip. One evidence nitpick: hud.ts:60 caps the display at Math.min(n,8), so it renders '8/8' in hit state rather than literally '9/8' \u2014 the substance of the claim (hit-state pip promising a win the evaluation never pays) is accurate. Severity (major, must-fix) is justified: it is a fairness/accuracy display defect during the bonus, the exact category Stake review scrutinizes, though payouts themselves are computed correctly."
+  }
+ ]
+}

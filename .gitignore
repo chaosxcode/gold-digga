@@ -1,0 +1,33 @@
+# deps / build
+node_modules/
+dist/
+build/
+.svelte-kit/
+.turbo/
+out/
+target/
+coverage/
+# python
+env/
+.venv/
+venv/
+__pycache__/
+*.pyc
+# generated math data (multi-GB — never commit)
+**/library/
+**/publish_files/
+**/books/
+**/sim/
+lookUpTable*
+*.zst
+*.jsonl
+*.csv
+*.npy
+# secrets
+.env
+*.env
+**/uploads/.env
+elevenlabs api.txt
+# os
+.DS_Store
+Thumbs.db

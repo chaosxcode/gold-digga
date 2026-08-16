@@ -1,0 +1,1177 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Gold Digga</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='42' fill='%23e8b54a' stroke='%236b4522' stroke-width='8'/%3E%3Ccircle cx='50' cy='50' r='14' fill='%236b4522'/%3E%3C/svg%3E" />
+  <style>
+    @font-face {
+      font-family: 'Baloo2';
+      src: url('/assets/fonts/Baloo2.woff2') format('woff2');
+      font-weight: 400 800;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'Rubik';
+      src: url('/assets/fonts/Rubik.woff2') format('woff2');
+      font-weight: 300 900;
+      font-display: swap;
+    }
+    /* GOLD DIGGER title/display font (Bungee) — replaces the old bubbly Baloo2
+       for every headline, label, announcement and dollar-amount readout */
+    @font-face {
+      font-family: 'GDTitle';
+      src: url('/assets/fonts/Bungee.ttf') format('truetype');
+      font-display: swap;
+    }
+    /* Celebration headlines + amounts (NIGHT DIG / DIG COMPLETE / BIG WIN / the
+       win amounts). TEAL to match the spin button (user) — was a gold gradient
+       with a brown #2a1206 stroke, which read brown. Stroke is a dark teal ink
+       rather than brown so the outline belongs to the same family. */
+    /* Celebration headlines + amounts (NIGHT DIG / DIG COMPLETE / BIG WIN / amounts).
+       DO NOT reintroduce `background-clip: text` here. It requires
+       `-webkit-text-fill-color: transparent`, which means the glyph has NO fill to
+       paint over the 4px text-stroke — so the STROKE colour becomes the text colour
+       and swallows the gradient entirely. That is why this read brown for months
+       (brown stroke) and then dark green (dark-teal stroke): the gradient underneath
+       was never visible. Solid fill + dark stroke + paint-order, exactly like
+       #sweep-counter, which renders correctly. */
+    #bigwin-tier, #bigwin-amount, #fc-title, #fc-amount {
+      -webkit-text-fill-color: currentColor;   /* fill MUST be opaque, see above */
+      paint-order: stroke fill;                /* fill paints over the stroke's inner half */
+      /* outer teal glow so the text stays legible on the dark blurred board */
+      filter: drop-shadow(0 3px 2px rgba(0,0,0,0.55)) drop-shadow(0 0 14px rgba(120,255,240,0.85));
+    }
+    :root {
+      /* 1 only inside the popout / short-landscape media query at the bottom of
+         this sheet. main.ts relayout() READS this instead of re-testing the
+         breakpoint in JS, so the CSS stays the single source of truth — the two
+         previously disagreed (CSS pinned the side columns from 300px tall, JS
+         only below 260px) and the board got positioned for the wrong layout. */
+      --popout: 0;
+      --popout-s: 0;
+      --meadow: #3e8e4e;
+      --meadow-deep: #2a6b38;
+      --gold: #e8b54a;
+      --gold-deep: #c08a2d;
+      --sky: #7ec8e3;
+      --poppy: #d94f3d;
+      --cream: #f5e9d0;
+      --wood: #8b5e34;
+      --wood-deep: #6b4522;
+      --ink: #2d2416;
+      --panel: rgba(26, 16, 46, 0.96);
+      --hair: rgba(245, 233, 208, 0.28);
+      --r-s: 8px;
+      --r-m: 14px;
+      --r-l: 22px;
+      --ease: cubic-bezier(0.16, 1, 0.3, 1);
+      --shadow: 0 4px 18px rgba(45, 30, 10, 0.35);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body {
+      width: 100%;
+      height: 100vh;            /* fallback for iOS < 15.4 */
+      height: 100dvh;           /* dynamic viewport: tracks Safari's toolbar so
+                                   no body-colour gap appears under the game */
+      overflow: hidden;
+      overscroll-behavior: none;
+      position: fixed; top: 0; left: 0;
+      font-family: 'Rubik', system-ui, sans-serif;
+      background: #d9ba6e;  /* warm tan (matches loader) so any first-paint flash isn't green */
+      touch-action: manipulation;
+      user-select: none; -webkit-user-select: none;
+    }
+    /* Orientation is driven by JS (body.landscape), NOT a CSS aspect-ratio
+       media query — iOS Safari evaluates aspect-ratio against the layout
+       viewport, which disagrees with the visual viewport the layout actually
+       uses, so a portrait phone was wrongly getting the landscape backdrop. */
+    #bg {
+      position: absolute; inset: 0;
+      background: url('/assets/bg/day_p.webp') center/cover no-repeat;
+      transition: filter 600ms;
+    }
+    body.landscape #bg { background-image: url('/assets/bg/day_l.webp'); }
+    body.night #bg { background-image: url('/assets/bg/night_p.webp'); }
+    body.night.landscape #bg { background-image: url('/assets/bg/night_l.webp'); }
+    /* night: re-light the scene, not just the backdrop — cool ambient grade
+       over board/symbols/mascot so day-lit art doesn't float on a night field */
+    /* NIGHT GRADE IS NOT DONE HERE. It used to be `filter: ...` on the whole
+       canvas, which also dimmed the mascot — she must POP at night (user).
+       Ron shares the canvas, so a CSS filter cannot exclude her; the grade is now
+       a Pixi ColorMatrixFilter applied to the BOARD container only, in
+       presenter.setNight(). Do not reintroduce a canvas-wide filter here. */
+    #game-container { position: absolute; inset: 0; }
+    #game-container canvas { position: absolute; inset: 0; }
+
+    /* ---------- HUD ---------- */
+    #hud {
+      position: absolute; inset: 0; display: flex; flex-direction: column;
+      pointer-events: none; z-index: 5;
+    }
+    #hud button { pointer-events: auto; }
+
+    #topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 8px; padding: max(6px, env(safe-area-inset-top)) 10px 6px;
+      pointer-events: none;
+    }
+    #brand { display: flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; }
+    #brand img { height: clamp(26px, 5.4vh, 44px); display: block; filter: drop-shadow(0 2px 4px rgba(45,30,10,.4)); }
+    #dock-face { width: clamp(30px, 6vh, 46px); height: clamp(30px, 6vh, 46px); border-radius: 50%; background: var(--cream) center/cover; border: 2px solid var(--gold); box-shadow: var(--shadow); flex: none; transition: transform 200ms var(--ease); }
+    #dock-face.excited { transform: scale(1.12) rotate(-4deg); }
+
+    #depth-pills { display: none !important; }
+    .pill {
+      font-family: 'GDTitle', 'Baloo2'; font-weight: 700; font-size: clamp(8px, 1.5vh, 11px);
+      letter-spacing: 0.04em; text-transform: uppercase;
+      color: var(--cream); background: rgba(45, 36, 22, 0.55);
+      border: 1.5px solid var(--hair); border-radius: 999px;
+      padding: 3px 9px; opacity: 0.55; transition: all 300ms var(--ease);
+      white-space: nowrap;
+    }
+    .pill.lit { opacity: 1; box-shadow: 0 0 12px rgba(232, 181, 74, 0.55); border-color: var(--gold); }
+    .pill[data-d='0'].lit { background: var(--meadow); }
+    .pill[data-d='1'].lit { background: #a86a2e; }
+    .pill[data-d='2'].lit { background: linear-gradient(180deg, var(--gold), var(--gold-deep)); color: var(--ink); }
+
+    /* Signal meter: Ron's readout device art IS the meter (design doc asset 32) */
+    #meter-box {
+      position: relative; flex: none; text-align: center;
+      width: clamp(84px, 15vh, 118px); aspect-ratio: 1 / 1;
+      background: url('/assets/ui/meter.webp') center top / 100% auto no-repeat;
+      filter: drop-shadow(0 3px 8px rgba(45, 30, 10, 0.4));
+    }
+    #meter-box.hot-box { filter: drop-shadow(0 3px 8px rgba(45, 30, 10, 0.4)) drop-shadow(0 0 12px rgba(217, 79, 61, 0.65)); }
+    #meter-label {
+      display: none; /* the gauge art already reads as a meter; the value sits in the slot */
+      position: absolute; top: 24%; left: 0; right: 0;
+      font-family: 'GDTitle', 'Baloo2'; font-weight: 700; font-size: clamp(6px, 1.2vh, 9px);
+      letter-spacing: 0.14em; color: rgba(245, 233, 208, 0.7); text-transform: uppercase;
+    }
+    #meter-value {
+      position: absolute; top: 66%; left: 14%; right: 14%;
+      font-family: 'GDTitle', 'Baloo2'; font-weight: 800; font-size: clamp(16px, 3.2vh, 26px);
+      line-height: 1; color: #ffd97a; font-variant-numeric: tabular-nums;
+      text-shadow: 0 0 10px rgba(232, 181, 74, 0.55), 0 1px 2px rgba(0, 0, 0, 0.6);
+      transition: transform 150ms var(--ease), color 150ms;
+    }
+    #meter-value.hot { color: #ff8a5e; text-shadow: 0 0 12px rgba(217, 79, 61, 0.8), 0 1px 2px rgba(0, 0, 0, 0.6); }
+    #meter-box.bump #meter-value { transform: scale(1.25); }
+    #meter-needle {
+      position: absolute; left: 50%; top: 70%; width: 3.5%; height: 16%;
+      transform-origin: 50% 100%;
+      transform: translateX(-50%) rotate(var(--needle, -50deg));
+      background: linear-gradient(180deg, #e0503a, #7e2a1c);
+      border-radius: 40% 40% 20% 20%; z-index: 1;
+      transition: transform 220ms var(--ease);
+    }
+
+    /* the meter column: the n/8 pips hang CENTRED under the meter box (user).
+       #pips-row is absolute so its width (0-3 pips, changes every sweep) never
+       feeds back into the topbar layout — relayout() bounds the board by
+       #meter-box's left edge, and an in-flow pips row would resize the board
+       mid-spin. right-clamped so a 3-pip row can't run off the screen edge. */
+    /* pulled off the right edge so the CENTRED pips underneath (wider than the
+       meter itself) don't run off the screen — user. */
+    #meter-col { position: relative; flex: none; margin-right: 46px; }
+    #pips-row {
+      position: absolute; top: calc(100% + 3px); left: 50%; transform: translateX(-50%);
+      display: flex; justify-content: center; gap: 5px; min-height: 20px;
+      white-space: nowrap; pointer-events: none;
+    }
+    .pip {
+      display: flex; align-items: center; gap: 4px;
+      font-family: 'GDTitle', 'Baloo2'; font-weight: 700; font-size: clamp(9px, 1.7vh, 12px);
+      color: var(--cream); background: rgba(45, 36, 22, 0.5);
+      border-radius: 999px; padding: 1px 8px 1px 3px;
+    }
+    .pip img { width: 16px; height: 16px; }
+    .pip.close { background: rgba(217, 79, 61, 0.75); }
+    .pip.hit { background: linear-gradient(180deg, var(--gold), var(--gold-deep)); color: var(--ink); box-shadow: 0 0 10px rgba(232,181,74,.6); }
+
+    #board-slot { flex: 1; min-height: 0; }
+
+    #equation-line {
+      text-align: center; min-height: 22px; padding: 0 8px;
+      font-family: 'GDTitle', 'Baloo2'; font-weight: 700; font-size: clamp(11px, 2vh, 15px);
+      color: var(--cream); text-shadow: 0 1px 3px rgba(45, 30, 10, 0.7);
+    }
+    #msg-line {
+      text-align: center; min-height: 24px; padding: 0 8px;
+      font-family: 'GDTitle', 'Baloo2'; font-weight: 800; font-size: clamp(13px, 2.4vh, 18px);
+      /* teal announcements to match the spin button (user); was var(--gold) */
+      color: #a8fff5; text-shadow: 0 1px 3px rgba(4, 32, 28, 0.85);
+      letter-spacing: 0.03em;
+    }
+    /* faded dark banner behind the announcement text ONLY when it has content, so
+       the win formula / messages stay readable where they cross the mascot */
+    #msg-line:not(:empty), #equation-line:not(:empty) {
+      background: linear-gradient(90deg, transparent, rgba(8, 4, 18, 0.55) 14%, rgba(8, 4, 18, 0.55) 86%, transparent);
+      border-radius: 8px;
+    }
+
+    /* ---------- controls ---------- */
+    #controls {
+      display: flex; align-items: center;
+      gap: 12px; justify-content: space-between; padding: 4px 16px 2px; pointer-events: none;
+    }
+    /* right cluster hugs the far right; spin sits to the right of it, clear of the mascot */
+    .ctl-group.right { margin-left: auto; order: 4; }
+    #controls > #spin-btn { order: 2; }
+    .ctl-group { display: flex; align-items: center; gap: 6px; }
+    .ctl-group.left { flex-direction: column; align-items: stretch; justify-content: center; gap: 4px; }
+    /* right cluster stacks the mute button above the turbo/auto/menu row */
+    .ctl-group.right { flex-direction: column; align-items: flex-end; justify-content: center; gap: 4px; }
+    .ctl-btn-row { display: flex; align-items: center; gap: 6px; }
+    /* hamburger — the only control beside Spin now; everything else is in the menu */
+    .hamburger {
+      order: 3; display: flex; flex-direction: column; justify-content: center; gap: 5px;
+      width: 50px; height: 50px; padding: 0 11px; flex: 0 0 auto;
+      background: rgba(18, 10, 38, 0.5); border: none; border-radius: 14px;
+      cursor: pointer; pointer-events: auto;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+    }
+    .hamburger span {
+      display: block; height: 4px; width: 100%; border-radius: 3px;
+      background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.8); transition: transform 140ms;
+    }
+    .hamburger:active { transform: scale(0.92); }
+    @media (min-width: 900px) {
+      /* desktop: big hero Spin (~2.5x), nudged 20px left; larger hamburger to match.
+         !important beats the base #spin-btn rule that appears later in the sheet */
+      #spin-btn { width: clamp(160px, 30vh, 224px) !important; height: clamp(160px, 30vh, 224px) !important; transform: translateX(-20px); }
+      .hamburger { width: 82px; height: 82px; gap: 8px; padding: 0 19px; }
+      .hamburger span { height: 6px; }
+      /* desktop: push the big spin over to the RIGHT next to the hamburger,
+         instead of floating huge in the dead centre (user request) */
+      #controls { justify-content: flex-start; }
+      #controls > #spin-btn { margin-left: auto; transform: none; }
+    }
+
+    /* Get Bonus plate — painted sign, direct line to the buy menu */
+    #bonus-btn {
+      background: none; border: none; padding: 0; cursor: pointer;
+      pointer-events: auto; line-height: 0;
+      filter: drop-shadow(0 3px 6px rgba(45, 30, 10, 0.45));
+      transition: transform 120ms var(--ease), filter 120ms;
+    }
+    #bonus-btn img { width: 100%; max-width: 150px; max-height: 46px; object-fit: contain; display: block; margin: 0 auto; }
+    @media (hover: hover) { #bonus-btn:not(:disabled):hover { filter: drop-shadow(0 3px 6px rgba(45, 30, 10, 0.45)) brightness(1.12); } }
+    #bonus-btn:not(:disabled):active { transform: translateY(2px); }
+    #bonus-btn:disabled { opacity: 0.5; cursor: default; }
+    #bonus-btn:focus-visible { outline: 3px solid var(--sky); outline-offset: 2px; }
+    .wood-btn {
+      font-family: 'GDTitle', 'Baloo2'; font-weight: 700; color: var(--cream);
+      background: linear-gradient(180deg, #1fc3b0, #0e7a8f);
+      border: 2px solid #0a5c66; border-radius: var(--r-m);
+      box-shadow: 0 3px 0 #0a5c66, var(--shadow);
+      min-width: 44px; min-height: 44px; font-size: 15px;
+      display: inline-flex; align-items: center; justify-content: center;
+      cursor: pointer; transition: transform 120ms var(--ease), filter 120ms;
+    }
+    @media (hover: hover) { .wood-btn:not(:disabled):hover { filter: brightness(1.12); } }
+    .wood-btn:not(:disabled):active { transform: translateY(2px); box-shadow: 0 1px 0 var(--wood-deep); }
+    .wood-btn:disabled { opacity: 0.45; cursor: default; }
+    .wood-btn:focus-visible { outline: 3px solid var(--sky); outline-offset: 2px; }
+    /* active/CTA state: painted gold-on-wood, never a flat web green */
+    .wood-btn.on {
+      background: linear-gradient(180deg, #ff8ccb, #ff3ea5 55%, #d81e83);
+      border-color: #b81570; color: #fff;
+      box-shadow: 0 3px 0 #b81570, 0 0 14px rgba(255, 62, 165, 0.5);
+      text-shadow: 0 1px 0 rgba(255, 240, 190, 0.6);
+    }
+
+    #bet-box { display: flex; align-items: center; gap: 4px; padding: 3px 6px; pointer-events: auto; }
+    /* soft dark halo hugging just the play amount (the −/+ have their own wood
+       bg on top); radial gradient → no hard borders, doesn't stretch to a bar */
+    #bet-box > div { position: relative; padding: 1px 10px; }
+    #bet-box > div::before {
+      content: ''; position: absolute; inset: -2px -2px;
+      background: radial-gradient(ellipse 70% 100% at 50% 50%, rgba(30, 22, 10, 0.62), rgba(30, 22, 10, 0));
+      z-index: -1;
+    }
+    #bet-label { font-family: 'GDTitle', 'Baloo2'; font-weight: 700; font-size: 9px; letter-spacing: .08em; color: var(--cream); opacity: .8; text-transform: uppercase; text-align: center; }
+    #bet-value { font-family: 'GDTitle', 'Baloo2'; font-weight: 800; font-size: clamp(13px, 2.4vh, 17px); color: #fff; font-variant-numeric: tabular-nums; min-width: 56px; text-align: center; }
+    .step-btn { min-width: 34px; min-height: 34px; font-size: 19px; border-radius: var(--r-s); }
+    /* extend small controls to a >=44px touch target without growing them visually */
+    .step-btn, .x-btn { position: relative; }
+    .step-btn::after, .x-btn::after { content: ''; position: absolute; inset: min(-5px, calc((44px - 100%) / -2)); }
+
+    #spin-btn {
+      width: clamp(64px, 12vh, 92px); height: clamp(64px, 12vh, 92px);
+      border-radius: 50%; border: 4px solid var(--gold-deep);
+      background: radial-gradient(circle at 50% 34%, #ffd97a, var(--gold) 55%, var(--gold-deep));
+      box-shadow: 0 5px 0 var(--gold-deep), 0 6px 22px rgba(45, 30, 10, 0.45);
+      cursor: pointer; position: relative;
+      display: flex; align-items: center; justify-content: center;
+      transition: transform 120ms var(--ease), filter 200ms;
+      pointer-events: auto;
+    }
+    #spin-btn svg { width: 56%; height: 56%; fill: var(--ink); transition: transform 400ms var(--ease); }
+    @media (hover: hover) { #spin-btn:not(:disabled):hover { filter: brightness(1.08); } }
+    #spin-btn:not(:disabled):active { transform: translateY(3px); box-shadow: 0 2px 0 var(--gold-deep); }
+    #spin-btn:disabled { filter: saturate(0.15) brightness(0.7); opacity: 0.55; cursor: default; }
+    #spin-btn:focus-visible { outline: 3px solid var(--sky); outline-offset: 3px; }
+    #spin-btn.spinning svg { transform: rotate(360deg); }
+
+    /* --- imaged control buttons: the art IS the button --- */
+    .img-btn { background: none !important; border: none !important; box-shadow: none !important; padding: 0; overflow: visible; }
+    .img-btn img { width: 100%; height: 100%; object-fit: contain; display: block; pointer-events: none; }
+    #sound-btn.muted { opacity: .55; filter: grayscale(.55); }
+    #turbo-btn.on { filter: drop-shadow(0 0 8px rgba(232, 181, 74, .85)); }
+    #spin-btn { background: none; border: none; box-shadow: none; }
+    #spin-btn img { width: 100%; height: 100%; object-fit: contain; display: block; pointer-events: none; transition: transform 400ms var(--ease); }
+    #spin-btn.spinning img { transform: rotate(360deg); }
+    /* big hovering logo */
+    #brand { overflow: visible; }
+    /* Desktop logo size is load-bearing on the BOARD size: relayout()'s wide branch
+       starts the board right of the left cluster (logo / Get Bonus / bet), so a wide
+       logo shrinks the grid. At 1400x900 a 132px logo is 278px wide and costs the
+       board 60px; at 96px it is ~210px wide and the board gets its full 822. Below
+       this, Get Bonus (204px) is the floor and shrinking further buys nothing. */
+    #brand img#brand-logo { height: clamp(64px, 11vh, 96px); animation: logo-float 3.2s ease-in-out infinite; transform-origin: center; }
+    @keyframes logo-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-9px); } }
+    /* small control buttons; settings tiny (user) */
+    #sound-btn, #turbo-btn { width: 40px; height: 40px; min-width: 0; min-height: 0; }
+    #auto-btn { min-width: 34px; min-height: 34px; font-size: 12px; padding: 0;
+      background: url('/assets/ui/btn_autoplay.webp') center / contain no-repeat; border: none; box-shadow: none;
+      color: #eafff4; text-shadow: 0 1px 3px rgba(0,0,0,.9); }
+    #meter-needle { display: none; } /* new square meter shows the multiplier in its readout slot */
+    /* imaged +/- step buttons must stay small (the octagon art would otherwise fill unconstrained) */
+    .step-btn.img-btn { width: 46px; height: 46px; min-width: 46px; min-height: 46px; flex: 0 0 auto; padding: 0; }
+    /* #menu-btn is now the .hamburger — sizing is handled by the .hamburger rule */
+
+    #footer {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 2px 12px max(6px, env(safe-area-inset-bottom));
+      font-variant-numeric: tabular-nums;
+    }
+    .money-block { text-align: center; min-width: 90px; background: rgba(30, 22, 10, 0.35); border-radius: var(--r-s); padding: 2px 10px; }
+    body.night .money-block { background: rgba(18, 12, 5, 0.55); }
+    .money-label { font-family: 'GDTitle', 'Baloo2'; font-weight: 700; font-size: clamp(8px, 1.4vh, 10px); letter-spacing: 0.1em; color: var(--cream); opacity: 0.75; text-transform: uppercase; }
+    .money-value { font-family: 'GDTitle', 'Baloo2'; font-weight: 800; font-size: clamp(14px, 2.6vh, 19px); color: #fff; text-shadow: 0 1px 3px rgba(45, 30, 10, 0.7); }
+    #footer-mid { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+    /* mute sits above the turbo/auto/menu row (top of the right cluster) */
+    #sound-btn { font-size: 16px; }
+    #session-meta { text-align: center; font-family: 'GDTitle', 'Baloo2'; font-weight: 700; font-size: 9px; color: rgba(245, 233, 208, 0.7); font-variant-numeric: tabular-nums; letter-spacing: 0.06em; }
+    #win-value { color: rgba(245, 233, 208, 0.55); transition: color 250ms; }
+    #win-value.lit { color: var(--gold); text-shadow: 0 0 12px rgba(232, 181, 74, 0.6), 0 1px 3px rgba(45, 30, 10, 0.7); }
+
+    /* ---------- modals ---------- */
+    #scrim {
+      position: absolute; inset: 0; z-index: 20;
+      background: rgba(12, 8, 26, 0.62); backdrop-filter: blur(6px);
+      display: none; align-items: center; justify-content: center;
+    }
+    #scrim.open { display: flex; }
+    .modal {
+      display: none; flex-direction: column;
+      width: min(480px, calc(100vw - 24px)); max-height: min(86vh, 720px);
+      background: var(--panel);
+      /* clip the brown fill to inside the frame so it can't bleed through the
+         frame's transparent rounded corners as square brown nubs */
+      background-clip: padding-box;
+      border-radius: 22px;
+      /* border-image is always drawn as a RECTANGLE (it ignores border-radius),
+         so its brown wooden edge fills the square corners and pokes past the
+         curve. clip-path clips the WHOLE modal — frame, header, background — to
+         a rounded rect, giving clean transparent corners. drop-shadow (not
+         box-shadow) then follows that clipped shape. */
+      clip-path: inset(0 round 22px);
+      /* hand-painted wooden panel frame (design doc assets 38-39) */
+      border: 3px solid #1fbdb2;
+      border-image: none;
+      filter: drop-shadow(0 8px 22px rgba(0, 0, 0, 0.55)) drop-shadow(0 0 12px rgba(255, 62, 165, 0.32));
+      color: var(--cream); overflow: hidden;
+      animation: modalIn 340ms var(--ease);
+    }
+    .modal.open { display: flex; }
+    @keyframes modalIn { from { transform: translateY(24px) scale(0.97); opacity: 0; } }
+    .modal-head {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 16px;
+      background: linear-gradient(180deg, #17b8b0, #12708f);
+      border-bottom: 2px solid rgba(255, 62, 165, 0.55);
+      font-family: 'GDTitle', 'Baloo2'; font-weight: 800; font-size: 18px; letter-spacing: 0.04em;
+      color: #eafffb; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+    }
+    .modal-body {
+      overflow-y: auto; overflow-x: hidden; padding: 14px 16px; font-size: 14px; line-height: 1.55;
+      /* scroll affordance: content visibly continues past the fold */
+      background:
+        linear-gradient(rgba(26, 16, 46, 1) 30%, rgba(26, 16, 46, 0)) top / 100% 24px,
+        linear-gradient(rgba(26, 16, 46, 0), rgba(26, 16, 46, 1) 70%) bottom / 100% 24px,
+        radial-gradient(farthest-side at 50% 0, rgba(0, 0, 0, 0.4), transparent) top / 100% 12px,
+        radial-gradient(farthest-side at 50% 100%, rgba(0, 0, 0, 0.4), transparent) bottom / 100% 12px;
+      background-repeat: no-repeat;
+      background-attachment: local, local, scroll, scroll;
+    }
+    /* teal-gold themed backdrop behind the menu + info modal content */
+    #m-menu .modal-body, #m-info .modal-body {
+      background:
+        linear-gradient(180deg, #1c1140, #140c2e);
+    }
+    .modal-foot { display: flex; gap: 10px; padding: 12px 16px; border-top: 1px solid var(--hair); }
+    .modal-foot .wood-btn { flex: 1; padding: 10px; font-size: 15px; }
+    .x-btn { min-width: 36px; min-height: 36px; font-size: 16px; border-radius: 50%; }
+
+    .info-tabs { display: flex; gap: 4px; padding: 8px 12px 0; flex-wrap: wrap; }
+    .info-tab {
+      font-family: 'GDTitle', 'Baloo2'; font-weight: 700; font-size: 11px; letter-spacing: 0.03em;
+      background: none; border: 1.5px solid var(--hair); border-radius: 999px;
+      color: var(--cream); padding: 4px 10px; cursor: pointer;
+    }
+    .info-tab.active { background: linear-gradient(180deg, #ff6ec0, #e01f86); color: #fff; border-color: #ff3ea5; }
+    .info-page { display: none; }
+    .info-page.active { display: block; }
+    .info-page h3 { font-family: 'GDTitle', 'Baloo2'; font-size: 15px; margin: 12px 0 4px; color: #3fe0cf; }
+    .info-page table { width: 100%; border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+    .info-page td, .info-page th { padding: 4px 6px; border-bottom: 1px solid var(--hair); text-align: left; vertical-align: middle; }
+    .info-page td:last-child, .info-page th:last-child { text-align: right; }
+    /* fixed name column: pay cells keep their own line, never wrap mid-figure */
+    .info-page td:first-child { width: 38%; }
+    .info-page td:not(:first-child) { white-space: nowrap; }
+    .pay-sym { width: 30px; height: 30px; vertical-align: middle; }
+    /* Controls page: every button is unlabelled ART, so the info must DEPICT each
+       one next to its description (Stake approval — raised on a sibling game). */
+    /* the generic paytable rules right-align and nowrap every non-first cell —
+       undo both here or the control descriptions become one unwrapped right-aligned line */
+    .ctl-table td:first-child { width: 76px; text-align: center; white-space: nowrap; }
+    .ctl-table td:last-child, .ctl-table td:not(:first-child) { text-align: left; white-space: normal; }
+    .ctl-ico { width: 32px; height: 32px; object-fit: contain; vertical-align: middle; display: inline-block; }
+    .ctl-burger {
+      background: rgba(20, 12, 34, 0.9); border-radius: 6px; padding: 6px 5px;
+      display: inline-flex; flex-direction: column; justify-content: center; gap: 3px;
+    }
+    .ctl-burger span { display: block; width: 20px; height: 3px; border-radius: 2px; background: #fff; }
+    /* winning / losing examples */
+    .ex-good { border-left: 3px solid #3fe0cf; padding-left: 8px; margin: 4px 0; }
+    .ex-bad { border-left: 3px solid #d94f3d; padding-left: 8px; margin: 4px 0; }
+    .legal { font-size: 11.5px; opacity: 0.85; }
+
+    /* play-amount adjuster inside the Buy Bonus modal */
+    #buy-bet-row {
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      margin: 0 0 12px; padding: 8px 10px;
+      background: rgba(40, 26, 66, 0.55); border-radius: var(--r-m);
+      border: 1.5px solid var(--hair);
+    }
+    #buy-bet-row .bbr-label {
+      font-family: 'GDTitle', 'Baloo2'; font-weight: 700; font-size: 11px; letter-spacing: .08em;
+      color: var(--cream); opacity: .8; text-transform: uppercase;
+    }
+    #buy-bet-value {
+      font-family: 'GDTitle', 'Baloo2'; font-weight: 800; font-size: clamp(15px, 3vh, 19px);
+      color: #fff; font-variant-numeric: tabular-nums; min-width: 66px; text-align: center;
+    }
+
+    .buy-card {
+      position: relative;
+      display: flex; align-items: center; gap: 12px;
+      background: linear-gradient(180deg, rgba(31, 189, 178, 0.14), rgba(123, 47, 247, 0.16));
+      border: 2px solid #1fa89e; border-radius: var(--r-m);
+      padding: 12px; margin-bottom: 10px; cursor: pointer;
+      transition: border-color 150ms, background 150ms, box-shadow 150ms;
+    }
+    .buy-card.selected {
+      border-color: #ff3ea5; background: rgba(255, 62, 165, 0.14);
+      box-shadow: 0 0 14px rgba(255, 62, 165, 0.4);
+    }
+    .buy-card.selected::after {
+      content: '✓'; position: absolute; top: -9px; right: -7px;
+      width: 24px; height: 24px; border-radius: 50%;
+      background: #ff3ea5; color: #fff;
+      font-weight: 800; font-size: 15px; line-height: 24px; text-align: center;
+      box-shadow: var(--shadow);
+    }
+    .buy-card .bc-title { font-family: 'GDTitle', 'Baloo2'; font-weight: 800; font-size: 15px; }
+    .buy-card .bc-desc { font-size: 12px; opacity: 0.85; }
+    .buy-card .bc-cost { margin-left: auto; text-align: right; font-family: 'GDTitle', 'Baloo2'; font-weight: 800; font-size: 15px; color: #5fe6d4; white-space: nowrap; }
+    .bc-max { display: block; font-size: 10.5px; font-weight: 600; opacity: .8; }
+
+    .toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; }
+    /* toggle plank: carved wood groove + painted gold rosette knob */
+    .switch { position: relative; width: 56px; height: 30px; flex: none; cursor: pointer; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .switch .track {
+      position: absolute; inset: 0; border-radius: 999px;
+      background: linear-gradient(180deg, #3a2f52, #241a38);
+      border: 2px solid #1a1230;
+      box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.5);
+      transition: background 200ms, box-shadow 200ms;
+    }
+    .switch input:checked + .track {
+      background: linear-gradient(180deg, #22c3b0, #0e7a72);
+      box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.35), 0 0 10px rgba(34, 195, 176, 0.45);
+    }
+    .switch .knob {
+      position: absolute; top: 1px; left: 1px; width: 28px; height: 28px;
+      background: radial-gradient(circle at 40% 34%, #ffffff, #dfeeea 62%, #a9c7c0);
+      border-radius: 50%; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.45);
+      transition: left 200ms var(--ease);
+    }
+    .switch input:checked ~ .knob { left: 27px; }
+
+    /* feature trigger / summary card */
+    #feature-card {
+      position: absolute; inset: 0; z-index: 16; display: none;
+      align-items: center; justify-content: center;
+      background: rgba(30, 22, 10, 0.55); backdrop-filter: blur(5px);
+    }
+    #feature-card.open { display: flex; }
+    #fc-inner {
+      --plaque-w: min(230px, 52vw);
+      display: flex; flex-direction: column; align-items: center; gap: 8px;
+      max-width: min(400px, 88vw); text-align: center;
+      animation: modalIn 400ms var(--ease); padding: 10px;
+    }
+    #fc-plaque { width: var(--plaque-w); display: none; filter: drop-shadow(0 8px 24px rgba(45,30,10,.5)); }
+    #fc-art { display: none; gap: 10px; justify-content: center; }
+    #fc-art.show { display: flex; }
+    #fc-art img {
+      width: clamp(54px, 14vw, 84px);
+      filter: drop-shadow(0 6px 14px rgba(45, 30, 10, 0.5));
+      animation: chestIn 500ms var(--ease) backwards;
+    }
+    #fc-art img:nth-child(2) { animation-delay: 130ms; }
+    #fc-art img:nth-child(3) { animation-delay: 260ms; }
+    @keyframes chestIn { from { transform: translateY(-46px) scale(0.3); opacity: 0; } }
+    /* summary: the top find sits in the museum plaque's frame — both margins key
+       off --plaque-w so the composition survives the popout override below */
+    #fc-inner.has-plaque #fc-art { margin-top: calc(var(--plaque-w) * -0.66); margin-bottom: calc(var(--plaque-w) * 0.32); }
+    #fc-inner.has-plaque #fc-art img { width: clamp(48px, 12vw, 72px); }
+    /* NOTE: these rules tie on specificity with the gradient treatment at the top
+       of the sheet and win on source order — so the STROKE colour here is what the
+       text actually reads as. It was `var(--wood-deep)` (#6b4522, brown) at 4px,
+       which swamped the fill and made the whole headline look brown. Teal (user). */
+    #fc-title {
+      font-family: 'GDTitle', 'Baloo2'; font-weight: 800; font-size: clamp(30px, 8vw, 54px);
+      color: #a8fff5; -webkit-text-stroke: 4px #06231f; paint-order: stroke fill;
+      text-shadow: 0 3px 0 #06231f, 0 8px 30px rgba(4,32,28,.6);
+    }
+    #fc-sub { font-family: 'GDTitle', 'Baloo2'; font-weight: 700; font-size: clamp(14px, 3.4vw, 19px); color: var(--cream); }
+    #fc-amount { font-family: 'GDTitle', 'Baloo2'; font-weight: 800; font-size: clamp(26px, 7vw, 46px); color: #a8fff5; font-variant-numeric: tabular-nums; -webkit-text-stroke: 3px #06231f; paint-order: stroke fill; text-shadow: 0 3px 0 #06231f, 0 0 30px rgba(120,255,240,.8); }
+    #fc-stats { font-size: 12.5px; color: var(--cream); opacity: .9; }
+    #fc-btn { padding: 10px 30px; font-size: 16px; }
+
+    /* big win overlay */
+    #bigwin {
+      position: absolute; inset: 0; z-index: 15; display: none;
+      align-items: center; justify-content: center; flex-direction: column;
+      pointer-events: none;
+    }
+    #bigwin.open {
+      display: flex;
+      background: radial-gradient(ellipse at center, rgba(30, 22, 10, 0.42) 20%, rgba(30, 22, 10, 0.78));
+      backdrop-filter: blur(4px);
+    }
+    #bigwin-plaque {
+      position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+      width: min(380px, 86vw); z-index: 0;
+      filter: drop-shadow(0 10px 30px rgba(45, 30, 10, 0.6));
+      animation: tierIn 500ms var(--ease);
+    }
+    #bigwin-tier, #bigwin-amount, #bigwin-tap { position: relative; z-index: 1; }
+    /* front-page banner — shown on EPIC/MEGA+ and max win */
+    #bigwin-news {
+      position: relative; z-index: 1; display: none;
+      width: clamp(180px, 52vw, 300px); margin-bottom: 14px;
+      filter: drop-shadow(0 8px 22px rgba(45, 30, 10, 0.6));
+      animation: newsIn 560ms cubic-bezier(0.2, 1.4, 0.4, 1) both;
+    }
+    #bigwin.news #bigwin-news { display: block; }
+    @keyframes newsIn { from { transform: scale(0.2) rotate(-14deg); opacity: 0; } }
+    /* bold tier banner (BIG/MEGA/EPIC/MAX WIN) — zooms in big, centre screen */
+    /* two-layer win banner: stone plaque slams in, gold letters pop on top after */
+    #bigwin-hero { position: relative; display: none; margin-bottom: 8px; }
+    #bigwin.banner #bigwin-hero { display: inline-block; }
+    #bigwin-plaque-art {
+      display: block; width: min(780px, 96vw); max-height: 52vh; object-fit: contain;
+      filter: drop-shadow(0 12px 34px rgba(10, 22, 8, 0.8));
+      animation: plaqueSlam 540ms cubic-bezier(0.2, 1.3, 0.3, 1) both;
+    }
+    #bigwin-letters {
+      position: absolute; left: 50%; top: 45%; transform: translate(-50%, -50%);
+      width: 74%; object-fit: contain; z-index: 2;
+      filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.5));
+      animation: lettersPop 520ms 210ms cubic-bezier(0.2, 1.6, 0.35, 1) both;
+    }
+    #bigwin.banner #bigwin-plaque, #bigwin.banner #bigwin-tier, #bigwin.banner #bigwin-news { display: none; }
+    @keyframes plaqueSlam {
+      0% { transform: scale(0.12) rotate(-5deg); opacity: 0; }
+      70% { transform: scale(1.06); opacity: 1; }
+      100% { transform: scale(1) rotate(0); opacity: 1; }
+    }
+    @keyframes lettersPop {
+      0% { transform: translate(-50%, -50%) scale(0.3); opacity: 0; }
+      65% { transform: translate(-50%, -50%) scale(1.15) rotate(2deg); opacity: 1; }
+      100% { transform: translate(-50%, -50%) scale(1) rotate(0); opacity: 1; }
+    }
+    .bc-art { border-radius: 8px; object-fit: cover; flex: 0 0 auto; box-shadow: 0 2px 8px rgba(45, 30, 10, 0.4); }
+    /* same story as #fc-title: the stroke here is what the eye reads. Teal (user). */
+    #bigwin-tier {
+      font-family: 'GDTitle', 'Baloo2'; font-weight: 800;
+      font-size: clamp(34px, 9vw, 72px); letter-spacing: 0.02em; color: #a8fff5;
+      -webkit-text-stroke: 4px #06231f; paint-order: stroke fill;
+      text-shadow: 0 3px 0 #06231f, 0 8px 30px rgba(4, 32, 28, 0.6);
+      animation: tierIn 500ms var(--ease);
+    }
+    #bigwin-amount {
+      font-family: 'GDTitle', 'Baloo2'; font-weight: 800;
+      font-size: clamp(30px, 8vw, 62px); color: #a8fff5; font-variant-numeric: tabular-nums;
+      -webkit-text-stroke: 3px #06231f; paint-order: stroke fill;
+      text-shadow: 0 3px 0 #06231f, 0 0 34px rgba(120, 255, 240, 0.85);
+    }
+    @keyframes tierIn { from { transform: scale(0.4); opacity: 0; } }
+    #bigwin-tap { margin-top: 12px; font-family: 'GDTitle', 'Baloo2'; font-weight: 700; font-size: 13px; color: var(--cream); opacity: 0.8; }
+
+    #sweep-counter {
+      /* sits in the sky band above the grid (was top:50% — dead-center over the
+         live tiles); the persistent below-board #msg-line carries it too */
+      position: absolute; top: 26%; left: 50%; transform: translate(-50%, -50%);
+      display: none; z-index: 14; pointer-events: none;
+      font-family: 'GDTitle', 'Baloo2'; font-weight: 800; font-size: clamp(22px, 6vw, 40px);
+      /* teal to match the spin button (user); was bright gold on a brown #170b03
+         stroke. Keep the thick dark stroke — it's what makes it readable over
+         the live tiles. */
+      color: #a8fff5; -webkit-text-stroke: 3.5px #06231f; paint-order: stroke fill;
+      text-shadow: 0 3px 0 #06231f, 0 0 18px rgba(0, 0, 0, 0.8);
+    }
+
+    /* loading */
+    #loader {
+      position: absolute; inset: 0; z-index: 50;
+      /* solid colour + gradient UNDER the splash image so the loader is NEVER
+         transparent while loading.webp downloads — was flashing the body green
+         and the raw HUD through before the splash painted */
+      background-color: #d9ba6e;
+      background-image: url('/assets/ui/loading.webp'), linear-gradient(180deg, #f0dfae, #d9ba6e);
+      background-size: cover; background-position: center; background-repeat: no-repeat;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+    }
+    #loader img.logo { width: min(300px, 62vw); filter: drop-shadow(0 6px 18px rgba(45,30,10,.5)); }
+    /* desktop/landscape gets the wide loading splash instead of the portrait one */
+    body.landscape #loader { background-image: url('/assets/bg/loading_l.webp'), linear-gradient(180deg, #16241a, #0c130d); }
+    body.landscape #loader-note { color: #d7ffe6; text-shadow: 0 1px 4px rgba(0,0,0,.75); }
+    /* apply the wide night splash IMMEDIATELY on wide viewports (before JS adds
+       .landscape) so desktop never flashes the stretched portrait splash */
+    @media (min-aspect-ratio: 1/1) {
+      #loader { background-image: url('/assets/bg/loading_l.webp'), linear-gradient(180deg, #16241a, #0c130d); }
+      #loader-note { color: #d7ffe6; text-shadow: 0 1px 4px rgba(0,0,0,.75); }
+    }
+    #loader-note, #loader-start { text-shadow: 0 1px 3px rgba(245,233,208,.8); }
+    #loader-bar { width: min(280px, 60vw); height: 12px; border-radius: 999px; background: rgba(45, 30, 10, 0.25); overflow: hidden; border: 2px solid var(--wood); }
+    #loader-fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--gold), var(--poppy)); transition: width 300ms; border-radius: 999px; }
+    #loader-start {
+      display: none; background: none; border: none; box-shadow: none;
+      padding: 6px; color: #fff; font-weight: 700; font-size: 16px;
+      letter-spacing: .03em; text-shadow: 0 2px 6px rgba(0,0,0,.85);
+      animation: loaderPulse 1.5s ease-in-out infinite;
+    }
+    @keyframes loaderPulse { 0%, 100% { opacity: .6; } 50% { opacity: 1; } }
+    #loader-note { font-family: 'GDTitle', 'Baloo2'; font-weight: 700; color: var(--wood-deep); font-size: 13px; }
+
+    /* replay */
+    #replay-badge {
+      position: absolute; top: max(6px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
+      z-index: 18; display: none;
+      font-family: 'GDTitle', 'Baloo2'; font-weight: 800; font-size: 12px; letter-spacing: 0.12em;
+      color: var(--ink); background: var(--gold); border-radius: 999px; padding: 4px 14px;
+      box-shadow: var(--shadow);
+    }
+
+    /* #brand img (1-0-1) outranks a bare id (1-0-0), so the hide must carry
+       the same compound selector or it silently never applies */
+    @media (max-width: 640px) {
+      /* mobile portrait: show the logo at ~half its desktop size and drop the
+         little mascot face thumbnail next to it (user request) */
+      #brand img#brand-logo { display: block; height: clamp(38px, 8vh, 64px); }
+      #dock-face { display: none; }
+      /* signal meter at HALF size on mobile, and a tight topbar so the board
+         rides ~100px higher (user request) */
+      #meter-box { width: clamp(46px, 8vh, 60px); }
+      #meter-value { font-size: clamp(11px, 2.3vh, 16px); }
+      #meter-label { font-size: clamp(5px, 1vh, 7px); top: 22%; }
+      #topbar { padding: max(3px, env(safe-area-inset-top)) 8px 0; }
+      /* Stake approval: info text must stay readable on phones — a sibling game was
+         rejected for "certain text in the info is too small in the Mobile view".
+         The info is a scrolling modal, so bigger type costs nothing but scroll. */
+      #m-info .info-page, #m-info .info-page p { font-size: 14px; line-height: 1.5; }
+      #m-info .info-page h3 { font-size: 16.5px; }
+      #m-info .info-page table { font-size: 13.5px; }
+      #m-info .legal { font-size: 12.5px; opacity: 0.95; }
+      #m-info .info-tab { font-size: 13px; }
+      #m-info .ctl-ico { width: 30px; height: 30px; }
+      /* Portrait phones: the meter sits CENTRED on screen with its n/8 pips
+         directly underneath, also centred (user). The logo stays pinned left, so
+         the meter is taken out of the flex flow and centred on the viewport.
+         #pips-row goes back IN FLOW here: the portrait board is flush to the top,
+         so an absolute pips row would hang over the grid — in flow it grows the
+         meter column and the board starts below it. */
+      #topbar { position: relative; justify-content: center; }
+      /* logo pinned left and OUT of the flow, so the meter column centres on the
+         viewport rather than on the leftover space */
+      #brand { position: absolute; left: 8px; top: 50%; transform: translateY(-50%); }
+      #meter-col { margin-right: 0; display: flex; flex-direction: column; align-items: center; }
+      #pips-row { position: static; transform: none; min-height: 8px; padding: 0; gap: 4px; }
+      .pip { font-size: clamp(8px, 1.5vh, 10px); padding: 1px 6px 1px 2px; }
+    }
+
+    /* covers ALL phone widths (incl. 414/428/430px Pro-Max-class) — above 400px
+       the default large controls + Get Bonus plate overran the grid columns */
+    @media (max-width: 460px) {
+      #controls { padding: 4px 6px 2px; gap: 4px; }
+      .ctl-group { gap: 4px; }
+      .wood-btn { min-width: 38px; min-height: 38px; font-size: 13px; }
+      .step-btn { min-width: 28px; min-height: 28px; font-size: 16px; }
+      #bet-box { padding: 3px 4px; gap: 3px; }
+      #bet-value { min-width: 44px; font-size: 12px; }
+      #spin-btn { width: clamp(56px, 10.5vh, 72px); height: clamp(56px, 10.5vh, 72px); }
+      #footer { padding: 2px 8px max(4px, env(safe-area-inset-bottom)); }
+      .money-block { min-width: 70px; }
+      #meter-box { width: 76px; }
+      #bonus-btn img { max-height: 38px; }
+    }
+
+    @media (max-width: 380px) {
+      #depth-pills { flex: 0 1 auto; min-width: 0; }
+      .pill { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+    }
+
+    /* iPhone-SE-class widths (≤340px): the 3 right-side buttons + Get Bonus
+       plate overrun the grid columns → tighten buttons, gaps and the spin hero
+       so nothing spills off the right edge */
+    @media (max-width: 340px) {
+      #controls { gap: 3px; padding: 4px 5px 2px; }
+      .ctl-group { gap: 3px; }
+      .wood-btn { min-width: 33px; min-height: 33px; font-size: 12px; }
+      #spin-btn { width: 56px; height: 56px; }
+      #bet-box { gap: 2px; padding: 2px 3px; }
+      #bonus-btn img { max-height: 34px; }
+      #sound-btn { min-width: 34px; min-height: 34px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * { animation-duration: 1ms !important; transition-duration: 1ms !important; }
+    }
+
+    /* popout-S / tiny viewports: HUD leaves the flex flow and pins to left/right
+       columns so the board can take the full height (design doc §15 gate:
+       nothing over the grid, junk lows readable at 400x225) */
+    /* ── POPOUT / SHORT-LANDSCAPE ────────────────────────────────────────────
+       Stake's mini-player: Popout-S 400×225 and Popout-L 800×450 (also landscape
+       phones). The in-flow HUD rows cannot coexist with a board sized off the
+       viewport HEIGHT — the board ends up under the logo, the bet cluster and the
+       spin. Stake requires that nothing overlap the grid, so pin the HUD, the
+       controls and the footer into side columns and give the board the whole
+       middle. `--pcol` and the widget sizes scale with height so Popout-L is not
+       a blown-up Popout-S. KEEP THIS BLOCK LAST: several rules below tie on
+       specificity with the desktop/mobile ones and win only on source order.
+       The JS `tiny` flag in main.ts relayout() MUST match this query — if the CSS
+       pins the columns while the JS still runs the `wide` branch, the board is
+       positioned for a layout that isn't on screen. */
+    @media (max-height: 500px) and (orientation: landscape),
+           (max-width: 480px) and (max-height: 300px),
+           (max-height: 260px) {
+      :root { --popout: 1; --pcol: clamp(96px, 26vh, 150px); }
+      #dock-face { width: clamp(24px, 7vh, 38px); height: clamp(24px, 7vh, 38px); }
+      #spin-btn { width: clamp(46px, 15vh, 78px); height: clamp(46px, 15vh, 78px); border-width: 3px; }
+      .wood-btn { min-width: 30px; min-height: 30px; font-size: 12px; }
+      #pips-row, #equation-line { display: none; }
+      .pill { font-size: 7px; padding: 2px 6px; text-align: center; }
+      #meter-box { width: clamp(62px, 18vh, 96px); margin: 0 auto; }
+      #meter-value { font-size: clamp(13px, 3.6vh, 19px); }
+      .money-value { font-size: clamp(12px, 3vh, 17px); }
+      #msg-line { min-height: 14px; font-size: clamp(10px, 2.6vh, 14px); }
+      /* the desktop rule (#brand img#brand-logo) outranks a plain `#brand img`,
+         so match its specificity here or the full-size logo spills over the grid */
+      #brand img#brand-logo {
+        display: block; height: clamp(34px, 12vh, 56px);
+        max-width: calc(var(--pcol) - 8px); object-fit: contain; animation: none;
+      }
+
+      #hud { display: block; }
+      /* top | left+right | bottom — the bottom inset reserves the announcement
+         strip's band so #msg-line sits UNDER the grid rather than across it */
+      #board-slot { position: absolute; inset: 2px calc(var(--pcol) + 10px) clamp(18px, 5vh, 26px) calc(var(--pcol) + 2px); }
+      #topbar {
+        position: absolute; left: 0; top: 0; width: var(--pcol);
+        flex-direction: column; align-items: stretch; justify-content: flex-start;
+        gap: 3px; padding: 3px;
+      }
+      /* the ≤640px mobile block pulls #brand out of the flow (absolute, top:50%)
+         to centre the portrait meter — inside the popout column that parks the
+         logo exactly BEHIND the meter (Stake round 4: "the name of the game is
+         missing" at Popout-S). Re-anchor it in the column flow. Stacking face
+         over logo also keeps the pair inside --pcol: side by side they were
+         wider than the column and shoved the logo over the board's left edge
+         (round 4's Popout-L screenshot). */
+      #brand {
+        position: static; transform: none; justify-content: center;
+        flex-direction: column; align-items: center; gap: 3px; overflow: visible;
+      }
+      #depth-pills { flex-direction: column; gap: 2px; }
+      /* right: 8px pulls the whole button column off the screen edge (user:
+         "move the buttons off to the left a bit" — the + was clipped) */
+      #controls {
+        position: absolute; right: 8px; top: 0; bottom: 0; width: var(--pcol);
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        gap: 3px; padding: 3px;
+      }
+      .ctl-group, .ctl-group.left, .ctl-group.right { flex-direction: column; justify-content: center; gap: 3px; }
+      .ctl-btn-row { flex-direction: column; gap: 3px; }
+      /* Get Bonus pinned to the BOTTOM of the right column (user round 4:
+         visible at popout, not buried in the hamburger). Popout-S re-hides it
+         below — no room in its bottom button row. */
+      #bonus-btn { display: block; position: absolute; bottom: 4px; left: 5px; right: 5px; width: auto; }
+      #bonus-btn img { max-height: 30px; }
+      #sound-btn { display: none; }
+      /* fit the −/value/+ cluster inside the pinned column (it was spilling off
+         the right edge): drop the PLAY label (−/value/+ is self-evident) and
+         keep the whole cluster inside the column box. The value plate's generic
+         10px side padding and 28px min-width made the trio wider than --pcol at
+         every popout size (round 4: "+ is cut off screen") — tighten all three. */
+      #bet-box { padding: 2px; gap: 1px; justify-content: center; max-width: calc(var(--pcol) - 6px); }
+      #bet-label { display: none; }
+      #bet-box > div { padding: 1px 2px; }
+      .step-btn { min-width: clamp(20px, 6vh, 30px); min-height: clamp(20px, 6vh, 30px); font-size: 13px; }
+      /* the bet ± are .step-btn.img-btn, pinned to 46px by a TWO-class rule that
+         outranks the one above — at 46px the −/value/+ cluster is wider than the
+         column and the + was clipped off the right edge. Keep them pinned (the
+         octagon art balloons unpinned), just to a size that fits the column. */
+      .step-btn.img-btn {
+        width: clamp(22px, 6vh, 30px); height: clamp(22px, 6vh, 30px);
+        min-width: clamp(22px, 6vh, 30px); min-height: clamp(22px, 6vh, 30px);
+      }
+      #bet-value { min-width: 0; font-size: clamp(10px, 2.4vh, 13px); }
+      #footer {
+        position: absolute; left: 0; bottom: 0; width: var(--pcol);
+        flex-direction: column; gap: 2px; padding: 3px;
+      }
+      .money-block { min-width: 0; width: 100%; padding: 1px 4px; }
+      #msg-line { position: absolute; left: calc(var(--pcol) + 2px); right: calc(var(--pcol) + 10px); bottom: 1px; }
+      /* Game Info must be READABLE at Popout-S (Stake round 2: "only one line
+         can be read at a time"). Reclaim every vertical px: near-full-height
+         modal, slim head, compact tab strip → ~9 lines of 13px body text at
+         400×225. Selectors match the 640px mobile block's specificity; this
+         block is LAST so source order settles the tie. */
+      .modal { max-height: calc(100vh - 8px); width: min(480px, 100vw - 12px); }
+      .modal-head { padding: 3px 10px; font-size: 13px; }
+      .x-btn { min-width: 26px; min-height: 26px; font-size: 12px; }
+      .info-tabs { gap: 3px; padding: 4px 8px 0; }
+      #m-info .info-tab { font-size: 11px; padding: 2px 7px; }
+      #m-info .modal-body { padding: 6px 12px 10px; }
+      #m-info .info-page, #m-info .info-page p { font-size: 13px; line-height: 1.4; }
+      #m-info .info-page h3 { font-size: 13.5px; margin: 6px 0 2px; }
+      #m-info .info-page table { font-size: 12px; }
+      #m-info .ctl-ico { width: 24px; height: 24px; }
+      #m-info .pay-sym { width: 22px; height: 22px; }
+      .modal-foot { padding: 6px 10px; }
+      .modal-foot .wood-btn { padding: 6px; font-size: 13px; }
+      /* Final Win / trigger cards must stay INSIDE the frame (Stake round 3: the
+         DIG COMPLETE plaque + top-find art poked above it at 400×225). Sizes ride
+         vh so Popout-L isn't a blown-up Popout-S; the plaque margins follow
+         --plaque-w automatically. Worst stack at 225h ≈ 205px: fits. */
+      #fc-inner { --plaque-w: min(230px, 36vh); gap: 3px; padding: 2px 4px; }
+      #fc-inner.has-plaque #fc-art img { width: calc(var(--plaque-w) * 0.31); }
+      #fc-art img { width: clamp(26px, 12vh, 54px); }
+      #fc-title { font-size: clamp(15px, 9vh, 26px); -webkit-text-stroke-width: 2px; }
+      #fc-sub { font-size: 11px; }
+      #fc-amount { font-size: clamp(14px, 8vh, 24px); -webkit-text-stroke-width: 2px; }
+      #fc-stats { font-size: 11px; }
+      #fc-btn { padding: 5px 16px; font-size: 13px; }
+      /* BIG WIN overlays: the square plaque / newspaper art are viewport-WIDTH
+         sized and centred, so in short landscape they poke past the top and
+         bottom of the frame (same defect class as the DIG COMPLETE card).
+         Bound them by HEIGHT; shrink the tier/amount text to match. */
+      #bigwin-plaque { width: min(380px, 86vw, 92vh); }
+      #bigwin-news { width: min(300px, 56vh); margin-bottom: 6px; }
+      #bigwin-tier { font-size: clamp(18px, 10vh, 44px); -webkit-text-stroke-width: 2px; }
+      #bigwin-amount { font-size: clamp(16px, 9vh, 40px); -webkit-text-stroke-width: 2px; }
+      #bigwin-tap { margin-top: 6px; font-size: 11px; }
+    }
+
+    /* ── POPOUT-S (≤300px tall) — round-4 user layout ───────────────────────
+       Ron stands to the RIGHT of the board (the tiny relayout branch already
+       does this whenever the middle band has ≥110px slack — freeing the right
+       column below creates that slack), the buttons shrink into a row UNDER
+       the board, and the hamburger hangs off to the right edge. The board
+       gives up a 50px bottom band to fit them. relayout() centres the row on
+       the board and pins the hamburger via --popout-s — CSS owns the
+       breakpoint, the JS only reads the flag (round-1 rule). Every viewport
+       ≤300px tall is inside the popout media query above, and this block is
+       AFTER it, so these rules win the specificity ties on source order. */
+    @media (max-height: 300px) {
+      :root { --popout-s: 1; }
+      #board-slot { position: absolute; inset: 2px 2px 50px calc(var(--pcol) + 2px); }
+      #controls {
+        left: calc(var(--pcol) + 2px); right: 2px; top: auto; bottom: 15px;
+        width: auto; height: 32px;
+        flex-direction: row; align-items: center; justify-content: center;
+        gap: 4px; padding: 0;
+      }
+      .ctl-group, .ctl-group.left, .ctl-group.right { flex-direction: row; gap: 3px; }
+      .ctl-btn-row { flex-direction: row; }
+      #bonus-btn { display: none; }
+      #spin-btn { width: 32px; height: 32px; border-width: 2px; }
+      #menu-btn {
+        position: absolute; right: 0; width: 26px; height: 26px;
+        padding: 0 6px; gap: 3px; border-radius: 9px;
+      }
+      .hamburger span { height: 3px; }
+      #msg-line { left: calc(var(--pcol) + 2px); right: 2px; bottom: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div id="bg"></div>
+  <div id="game-container"></div>
+
+  <div id="hud">
+    <div id="topbar">
+      <div id="brand">
+        <div id="dock-face" role="img" aria-label="Gold Digga"></div>
+        <img id="brand-logo" src="/assets/ui/logo.webp" alt="Gold Digga" />
+      </div>
+      <div id="depth-pills" aria-label="Dig depth">
+        <span class="pill lit" data-d="0">Topsoil</span>
+        <span class="pill" data-d="1">Toxic</span>
+        <span class="pill" data-d="2">Motherlode</span>
+      </div>
+      <!-- the n/8 pips hang under the meter (user), so they live in its column -->
+      <div id="meter-col">
+        <div id="meter-box" aria-label="Signal meter">
+          <div id="meter-label">Signal</div>
+          <div id="meter-value">x1</div>
+          <div id="meter-needle" aria-hidden="true"></div>
+        </div>
+        <div id="pips-row" aria-hidden="true"></div>
+      </div>
+    </div>
+    <div id="board-slot"></div>
+    <div id="equation-line" aria-live="polite"></div>
+    <div id="msg-line" aria-live="polite"></div>
+    <!-- Everything but Spin lives under the hamburger menu (user request) -->
+    <div id="controls">
+      <div class="ctl-group left">
+        <button id="bonus-btn" aria-label="Get Bonus — open the bonus buy menu">
+          <img src="/assets/ui/get_bonus.webp" alt="Get Bonus" />
+        </button>
+        <div id="bet-box">
+          <button class="wood-btn step-btn img-btn" id="bet-down" aria-label="Decrease play amount"><img src="/assets/ui/btn_minus.webp" alt="−" /></button>
+          <div><div id="bet-label">Play</div><div id="bet-value">1.00</div></div>
+          <button class="wood-btn step-btn img-btn" id="bet-up" aria-label="Increase play amount"><img src="/assets/ui/btn_plus.webp" alt="+" /></button>
+        </div>
+      </div>
+      <button id="spin-btn" aria-label="Spin">
+        <img src="/assets/ui/btn_spin.webp" alt="Spin" />
+      </button>
+      <button id="menu-btn" class="hamburger" aria-label="Open menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+    <div id="footer">
+      <div class="money-block">
+        <div class="money-label" id="balance-label">Balance</div>
+        <div class="money-value" id="balance-value">1,000.00</div>
+      </div>
+      <div id="footer-mid">
+        <div id="session-meta" aria-hidden="true">
+          <div id="session-timer" style="display:none">00:00:00</div>
+          <div id="rtp-inline" style="display:none">RTP 96.65%</div>
+        </div>
+      </div>
+      <div class="money-block" id="net-block" style="display:none">
+        <div class="money-label">Net</div>
+        <div class="money-value" id="net-value">+0.00</div>
+      </div>
+      <div class="money-block">
+        <div class="money-label">Win</div>
+        <div class="money-value" id="win-value">0.00</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="sweep-counter"></div>
+  <div id="replay-badge">REPLAY</div>
+
+  <div id="feature-card">
+    <div id="fc-inner">
+      <img id="fc-plaque" src="/assets/ui/plaque.webp" alt="" />
+      <div id="fc-art" aria-hidden="true"></div>
+      <div id="fc-title"></div>
+      <div id="fc-sub"></div>
+      <div id="fc-amount"></div>
+      <div id="fc-stats"></div>
+      <button class="wood-btn on" id="fc-btn">Continue</button>
+    </div>
+  </div>
+
+  <div id="bigwin">
+    <img id="bigwin-plaque" src="/assets/ui/plaque.webp" alt="" />
+    <img id="bigwin-news" src="assets/ui/newspaper.webp" alt="" />
+    <div id="bigwin-hero"><img id="bigwin-plaque-art" alt="" /><img id="bigwin-letters" alt="" /></div>
+    <div id="bigwin-tier"></div>
+    <div id="bigwin-amount"></div>
+    <div id="bigwin-tap"></div>
+  </div>
+
+  <div id="scrim">
+    <!-- generic confirm -->
+    <div class="modal" id="m-confirm">
+      <div class="modal-head"><span id="confirm-title">Confirm</span></div>
+      <div class="modal-body" id="confirm-body"></div>
+      <div class="modal-foot">
+        <button class="wood-btn" id="confirm-cancel">Cancel</button>
+        <button class="wood-btn on" id="confirm-ok">Confirm</button>
+      </div>
+    </div>
+
+    <!-- menu -->
+    <div class="modal" id="m-menu">
+      <div class="modal-head"><span>Menu</span><button class="wood-btn x-btn" data-close aria-label="Close menu">✕</button></div>
+      <div class="modal-body">
+        <div class="toggle-row"><span>Sound</span>
+          <label class="switch"><input type="checkbox" id="sound-toggle" /><span class="track"></span><span class="knob"></span></label>
+        </div>
+        <div class="toggle-row"><span>Turbo</span>
+          <button class="wood-btn img-btn" id="turbo-btn" aria-label="Turbo mode"><img src="/assets/ui/btn_turbo.webp" alt="Turbo" /></button>
+        </div>
+        <div class="toggle-row"><span>Autoplay</span>
+          <button class="wood-btn" id="auto-btn" aria-label="Autoplay">▶▶</button>
+        </div>
+        <div class="toggle-row" id="row-rally"><span>Rally <small style="opacity:.8">+25% · double Loot Chests</small></span>
+          <label class="switch"><input type="checkbox" id="rally-toggle" /><span class="track"></span><span class="knob"></span></label>
+        </div>
+        <div class="toggle-row" id="row-coil"><span>Coil Select</span>
+          <button class="wood-btn" id="coil-btn" style="padding:6px 14px; font-size:13px;">Standard 9″</button>
+        </div>
+        <div class="toggle-row" id="row-buy"><span>Get Bonus</span>
+          <button class="wood-btn" id="open-buy" style="padding:6px 14px; font-size:13px;">Open</button>
+        </div>
+        <div class="toggle-row"><span>Game Info &amp; Rules</span>
+          <button class="wood-btn" id="open-info" style="padding:6px 14px; font-size:13px;">Open</button>
+        </div>
+        <!-- kept in the DOM (hidden) so the controller's wiring-by-id stays intact;
+             Sound is driven by the visible toggle above -->
+        <button id="sound-btn" aria-hidden="true" tabindex="-1" style="display:none"><img src="/assets/ui/btn_mute.webp" alt="" /></button>
+      </div>
+    </div>
+
+    <!-- coil select -->
+    <div class="modal" id="m-coil">
+      <div class="modal-head"><span>Coil Select</span><button class="wood-btn x-btn" data-close aria-label="Close coil select">✕</button></div>
+      <div class="modal-body">
+        <div class="buy-card" id="coil-std">
+          <img src="/assets/ui/coil_std.webp" alt="" width="54" height="54" />
+          <div><div class="bc-title">Standard Coil — 9″</div><div class="bc-desc">Steady. Shallow finds.</div></div>
+        </div>
+        <div class="buy-card" id="coil-xl">
+          <img src="/assets/ui/coil_xl.webp" alt="" width="54" height="54" />
+          <div><div class="bc-title">XL Deep Coil — 15″</div><div class="bc-desc">Rarer. Deeper. Richer.</div></div>
+        </div>
+        <p style="font-size:11.5px; opacity:.8; margin-top:6px;">Both return 96.65%. XL weights wins deeper. Rally is Standard coil only.</p>
+      </div>
+    </div>
+
+    <!-- buy menu -->
+    <div class="modal" id="m-buy">
+      <div class="modal-head"><span>Get Bonus</span><button class="wood-btn x-btn" data-close aria-label="Close buy menu">✕</button></div>
+      <div class="modal-body">
+        <div id="buy-bet-row">
+          <span class="bbr-label">Play</span>
+          <button class="wood-btn step-btn" id="buy-bet-down" aria-label="Decrease play amount">−</button>
+          <span id="buy-bet-value">1.00</span>
+          <button class="wood-btn step-btn" id="buy-bet-up" aria-label="Increase play amount">+</button>
+        </div>
+        <div class="buy-card" data-buy="feature_deepscan">
+          <img class="bc-art" src="/assets/ui/card_deepscan.webp" alt="" width="64" height="96" />
+          <div><div class="bc-title">Deep Scan Sweep</div><div class="bc-desc">Guaranteed Deep Scan hit.</div></div>
+          <div class="bc-cost"><span data-cost="5"></span><span class="bc-max">Max win 500x</span></div>
+        </div>
+        <div class="buy-card" data-buy="feature_bigdig">
+          <img class="bc-art" src="/assets/ui/card_bigdig.webp" alt="" width="64" height="96" />
+          <div><div class="bc-title">The Big Dig</div><div class="bc-desc">10 sweeps. Depth carries.</div></div>
+          <div class="bc-cost"><span data-cost="80"></span><span class="bc-max">Max win 15,000x</span></div>
+        </div>
+        <div class="buy-card" data-buy="feature_nightdig">
+          <img class="bc-art" src="/assets/ui/card_nightdig.webp" alt="" width="64" height="96" />
+          <div><div class="bc-title">Night Dig</div><div class="bc-desc">Toxic start. Double tags.</div></div>
+          <div class="bc-cost"><span data-cost="400"></span><span class="bc-max">Max win 15,000x</span></div>
+        </div>
+        <p style="font-size:11px; opacity:.75;">Each bonus is fixed — Coil Select doesn't apply.</p>
+      </div>
+      <div class="modal-foot">
+        <button class="wood-btn" data-close>Cancel</button>
+        <button class="wood-btn on" id="buy-accept" disabled>Get Bonus</button>
+      </div>
+    </div>
+
+    <!-- autoplay setup -->
+    <div class="modal" id="m-auto">
+      <div class="modal-head"><span>Autoplay</span><button class="wood-btn x-btn" data-close aria-label="Close autoplay setup">✕</button></div>
+      <div class="modal-body">
+        <p>Choose the number of automatic spins:</p>
+        <div style="display:flex; gap:8px; margin:12px 0; flex-wrap:wrap;" id="auto-counts">
+          <button class="wood-btn" data-n="10" style="flex:1;">10</button>
+          <button class="wood-btn" data-n="25" style="flex:1;">25</button>
+          <button class="wood-btn" data-n="50" style="flex:1;">50</button>
+          <button class="wood-btn" data-n="100" style="flex:1;">100</button>
+        </div>
+        <p id="auto-cost" style="font-size:12.5px; opacity:.85;"></p>
+      </div>
+      <div class="modal-foot">
+        <button class="wood-btn" data-close>Cancel</button>
+        <button class="wood-btn on" id="auto-start" disabled>Start Autoplay</button>
+      </div>
+    </div>
+
+    <!-- resume -->
+    <div class="modal" id="m-resume">
+      <div class="modal-head"><span>Unfinished Round</span></div>
+      <div class="modal-body" id="resume-body">You have an unfinished round.</div>
+      <div class="modal-foot">
+        <button class="wood-btn" id="resume-watch">Watch</button>
+        <button class="wood-btn on" id="resume-skip">Skip to Result</button>
+      </div>
+    </div>
+
+    <!-- replay gate -->
+    <div class="modal" id="m-replay">
+      <div class="modal-head"><span>Replay</span></div>
+      <div class="modal-body" id="replay-body"></div>
+      <div class="modal-foot">
+        <button class="wood-btn on" id="replay-play">Play</button>
+      </div>
+    </div>
+
+    <!-- error -->
+    <div class="modal" id="m-error">
+      <div class="modal-head"><span>Connection</span></div>
+      <div class="modal-body" id="error-body">Connection hiccup. Your balance is safe — the round will resolve when you reconnect.</div>
+      <div class="modal-foot">
+        <button class="wood-btn on" id="error-retry">Retry</button>
+      </div>
+    </div>
+
+    <!-- info / rules -->
+    <div class="modal" id="m-info">
+      <div class="modal-head"><span>Game Info</span><button class="wood-btn x-btn" data-close aria-label="Close game info">✕</button></div>
+      <div class="info-tabs" id="info-tabs"></div>
+      <div class="modal-body" id="info-body"></div>
+    </div>
+  </div>
+
+  <div id="loader">
+    <img class="logo" id="loader-logo" src="/assets/ui/logo.webp" alt="Sweeper" />
+    <div id="loader-bar"><div id="loader-fill"></div></div>
+    <div id="loader-note"></div>
+    <button id="loader-start">Press anywhere to continue…</button>
+  </div>
+
+  <script src="/stake-engine-bridge.js"></script>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
