@@ -24,6 +24,10 @@ Also live across Stake's platforms — **stake.com · stake.us · stake.eu · st
 
 It's a **social-casino** title — play is in Stake Cash / Gold Coins (`SC` / `GC`), no real-money wagering.
 
+## Gameplay
+
+![Gold Digga — the dig grid, the multiplier meter, and the mascot](assets/screenshot.png)
+
 ## Game facts
 
 | | |
