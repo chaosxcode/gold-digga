@@ -7,12 +7,11 @@
 **A Minesweeper-style dig-and-reveal game from [Spin Slaughter](https://stake.us/casino/games/spinslaughter-gold-digga).**
 *Read the signal. Dig. Bank it.*
 
-### ▶ Play now on Stake
+### Play Gold Digga
 
-**[stake.us — Gold Digga](https://stake.us/casino/games/spinslaughter-gold-digga)**
+**[Play on Stake.us](https://stake.us/casino/games/spinslaughter-gold-digga) · [Play on Stake.com](https://stake.com/casino/games/spinslaughter-gold-digga)**
 
-Also live across Stake's platforms — **stake.com · stake.us · stake.eu · stake.mx · staked.com**
-(global slug: `spinslaughter-gold-digga`)
+[All Spin Slaughter games](https://stake.us/casino/group/spin-slaughter) · [Source catalogue](https://github.com/chaosxcode/spin-slaughter) · [Ask me on X](https://x.com/SpinSlaughter)
 
 </div>
 
@@ -63,3 +62,10 @@ assets/      cover art
 <div align="center">
 <sub>© Spin Slaughter. Gold Digga is a social-casino game published on Stake. This repository contains game source for reference; it is not a standalone playable build.</sub>
 </div>
+
+
+## Open source for the next builder
+
+I'm sharing this frontend and math source because practical Stake game examples were hard to find when I started. I want the next beginner to have a real project to learn from.
+
+If you enjoy the game, please share it. If the code helps, star the repo or send it to someone learning. Questions? Reach me on [@SpinSlaughter](https://x.com/SpinSlaughter); I'm happy to help where I can.
